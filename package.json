@@ -1,0 +1,49 @@
+{
+  "name": "aws-serverless-poc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "serverless offline",
+    "deploy": "serverless deploy",
+    "remove": "serverless remove",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "build": "tsc",
+    "lint": "eslint ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.32.1",
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.4.3",
+    "@aws-lambda-powertools/logger": "^2.31.0",
+    "@aws-lambda-powertools/parser": "^2.31.0",
+    "@aws-sdk/client-dynamodb": "^3.1010.0",
+    "@aws-sdk/client-s3": "^3.1010.0",
+    "@aws-sdk/lib-dynamodb": "^3.1010.0",
+    "@middy/core": "^7.1.7",
+    "@middy/http-error-handler": "^7.1.7",
+    "@middy/http-json-body-parser": "^7.1.7",
+    "add": "^2.0.6",
+    "axios": "^1.13.6",
+    "middy": "^0.36.0",
+    "pnpm": "^10.32.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "@serverless/typescript": "^4.30.0",
+    "@types/aws-lambda": "^8.10.161",
+    "@types/node": "^25.5.0",
+    "esbuild": "^0.27.4",
+    "nock": "^14.0.11",
+    "serverless": "^4.33.0",
+    "serverless-dynamodb": "^0.2.56",
+    "serverless-offline": "^14.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "target": "esnext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "paths": {
+      "@@handlers/*": ["./src/handlers/*"],
+      "@@clients/*": ["./src/clients/*"],
+      "@@schemas/*": ["./src/schemas/*"]
+    }
+  }
+}

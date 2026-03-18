@@ -1,0 +1,423 @@
+
+1. The Error Normalizer (Middleware)
+This middleware sits at the "bottom" of the onion. It catches a ZodError or a generic Error and formats it so the user sees a helpful message instead of a terminal crash.
+import { MiddlewareObj } from '@middy/core';
+import { ZodError } from 'zod';
+
+export const handleApiErrors = (): MiddlewareObj => {
+  return {
+    onError: (request) => {
+      const error = request.error;
+
+      // 1. Handle Zod Validation Errors (400)
+      if (error instanceof ZodError) {
+        request.response = {
+          statusCode: 400,
+          body: JSON.stringify({
+            message: 'Validation Failed',
+            details: error.errors, // Shows exactly which field failed
+          }),
+        };
+        return;
+      }
+
+      // 2. Handle generic errors (500)
+      request.response = {
+        statusCode: 500,
+        body: JSON.stringify({
+          message: 'Internal Server Error',
+          error: error?.message || 'Unknown error',
+        }),
+      };
+    },
+  };
+};
+
+2. The Response Validator (Middleware)
+This ensures your Lambda doesn't accidentally leak sensitive data or return malformed JSON.
+import { ZodType } from 'zod';
+
+export const validateResponse = (schema: ZodType): MiddlewareObj => {
+  return {
+    after: (request) => {
+      const { response } = request;
+      if (response?.body) {
+        try {
+          const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+          schema.parse(data); // Throws ZodError if invalid, caught by handleApiErrors
+        } catch (e) {
+          console.error('Response Validation Error:', e);
+          throw e; 
+        }
+      }
+    },
+  };
+};
+
+3. The "Security Guard" Factory
+Now, wrap them into a single function. This uses the @aws-lambda-powertools/parser which is the industry standard for Zod + Lambda.
+import middy from '@middy/core';
+import httpJsonBodyParser from '@middy/http-json-body-parser';
+import { parser } from '@aws-lambda-powertools/parser/middleware';
+import { ZodType } from 'zod';
+
+export const createBaseHandler = (options: {
+  requestSchema: ZodType;
+  responseSchema?: ZodType;
+}) => {
+  const wrapper = middy()
+    .use(httpJsonBodyParser()) // Parse string to object
+    .use(parser({ schema: options.requestSchema })) // Validate Input
+    .use(handleApiErrors()); // Catch and format errors
+
+  if (options.responseSchema) {
+    wrapper.use(validateResponse(options.responseSchema)); // Validate Output
+  }
+
+  return wrapper;
+};
+
+4. How to use it in your Code
+Your handler now becomes extremely thin. You don't need JSON.parse or try/catch.
+import { UserSchema, UserResponseSchema } from '@@schemas/user/userSchema';
+
+const logic = async (event: any) => {
+  // event.body is ALREADY validated and typed here
+  const result = await createUser(event.body);
+  
+  return {
+    statusCode: 201,
+    body: JSON.stringify(result),
+  };
+};
+
+export const createUserHandler = createBaseHandler({
+  requestSchema: UserSchema,
+  responseSchema: UserResponseSchema
+}).handler(logic);
+
+Why this works:
+ * Incoming: If the user sends a bad email, the parser throws a ZodError.
+ * Intercept: The handleApiErrors catches it immediately.
+ * Output: The client gets a 400 Bad Request with a clear list of what went wrong.
+Would you like me to help you set up the APIError class so you can throw custom business errors (like "User Already Exists") that also return clean JSON?
+
+
+what is onion architecture
+
+
+Onion Architecture is a software architectural pattern introduced by Jeffrey Palermo in 2008. Its primary goal is to address the challenges of traditional N-tier architectures—specifically the problem of tight coupling and the "database-centric" mindset.
+In Onion Architecture, the Domain (your business logic and entities) is at the absolute center, and dependencies only point inward toward that center.
+The Layers of the Onion
+ * Domain Entities (The Core):
+   This is the heart of the application. It contains the fundamental business objects (e.g., User, Product, Order). These classes have no dependencies on any other layer or framework.
+ * Domain Services:
+   This layer contains the business logic that involves multiple entities. It defines interfaces (abstractions) for things the application needs to do, but it doesn't implement the technical details.
+ * Application Services (Use Cases):
+   This layer coordinates the flow of data. It implements the specific "tasks" of your app (e.g., CreateUserAccount). It uses the core entities and domain services to achieve a goal.
+ * Infrastructure & User Interface (The Outer Rim):
+   This is where the "real world" touches your app. It includes:
+   * Databases (SQL, DynamoDB)
+   * Web Frameworks (Express, Fastify, Lambda)
+   * Third-party APIs (Stripe, Twilio)
+   * User Interfaces (React, Vue, CLI)
+Key Principles
+1. The Dependency Rule
+This is the most important rule: Dependencies always point toward the center. * The Inner layers never know anything about the outer layers.
+ * The Domain doesn't know if it's being saved in a DynamoDB table or a text file. It doesn't care if the request came from a REST API or a GraphQL query.
+2. The Use of Abstractions (Interfaces)
+Because the core can't depend on the outer layers, we use Dependency Inversion.
+ * The Core defines an interface: IUserRepository.
+ * The Infrastructure layer implements that interface: DynamoDbUserRepository.
+ * At runtime, the implementation is "injected" into the core.
+3. Everything is Pluggable
+Because the business logic is isolated, you can swap out the outer layers with minimal effort. You could move from an AWS Lambda environment to a Google Cloud Function, or from PostgreSQL to MongoDB, without changing a single line of your core business logic.
+Why use it for Serverless?
+In your current AWS Serverless project, Onion Architecture is highly effective because:
+ * Testability: You can test your userService.ts (Core) without ever actually connecting to a real DynamoDB.
+ * Cleanliness: Your Lambda handlers (Outer Layer) stay very thin, only handling the "plumbing" like HTTP status codes and parsing, while the actual logic stays protected in the center.
+Comparison to Traditional Tiered Architecture
+| Feature | Traditional N-Tier | Onion Architecture |
+|---|---|---|
+| Center of Gravity | The Database | The Domain Logic |
+| Dependencies | Top-down (UI -> Logic -> DB) | Inward (Outer -> Center) |
+| Coupling | Tight (Logic depends on DB) | Loose (Infrastructure depends on Domain) |
+| Flexibility | Hard to switch databases | Highly swappable/pluggable |
+Would you like me to show how to structure your current aws-serverless-poc folders to follow this Onion pattern?
+
+
+
+To implement Onion Architecture in your aws-serverless-poc, you want to organize your folders so that your business logic (the "Core") is protected from the external "Infrastructure" (AWS, DynamoDB, API Gateway).
+1. The Clean Folder Structure
+Here is a "Universal List" (万能清淡) for your project structure:
+src/
+├── core/                 <-- THE INNER ONION (Pure Logic)
+│   ├── entities/         <-- Zod Schemas (User, Account)
+│   └── use-cases/        <-- Business rules (createUser, deleteUser)
+├── infrastructure/       <-- THE OUTER ONION (Tools)
+│   ├── persistence/      <-- DynamoDB Client, Repository implementations
+│   └── external-apis/    <-- Axios clients for 3rd party services
+├── handlers/             <-- THE ENTRY POINT (Lambda)
+│   └── user/             <-- createUserHandler.ts (Middy Factory)
+└── shared/               <-- Cross-cutting concerns
+    └── middleware/       <-- Your restApiHandler factory
+
+2. How the Code Flows (Inward Only)
+Layer 1: The Entity (Core)
+In src/core/entities/user.ts, you define what a User is using Zod. It doesn't know about AWS.
+export const UserSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+});
+export type User = z.infer<typeof UserSchema>;
+
+Layer 2: The Repository Interface (Core)
+In src/core/use-cases/ports.ts, you define what you need from a database, but not how to do it.
+export interface UserRepository {
+  save(user: User): Promise<void>;
+}
+
+Layer 3: The Infrastructure (Outer)
+In src/infrastructure/persistence/dynamo-user-repository.ts, you finally use the AWS SDK.
+import { docClient } from './client';
+
+export class DynamoUserRepository implements UserRepository {
+  async save(user: User) {
+    await docClient.put({ TableName: 'users', Item: user });
+  }
+}
+
+Layer 4: The Handler (Entry Point)
+In src/handlers/user/create-user-handler.ts, you use your Middy Factory to glue it all together.
+const repo = new DynamoUserRepository();
+
+export const createUserHandler = restApiHandler({
+  requestSchema: UserSchema,
+}).handler(async (body) => {
+  // Logic is decoupled from the HTTP request!
+  return await repo.save(body);
+});
+
+3. Why this solves your "Requested resource not found"
+By separating the Infrastructure (the DynamoDB client) into its own layer, you can easily swap the "Endpoint" based on whether you are running locally or in production.
+| Environment | Endpoint | Strategy |
+|---|---|---|
+| Local (pnpm dev) | http://localhost:8000 | Hits serverless-dynamodb |
+| Production | AWS Standard | Hits real DynamoDB |
+Next Step
+Since you have the restApiHandler factory ready, would you like me to help you refactor your userService.ts into a Repository class that fits this Onion pattern?
+
+很好，这个信息非常关键 👍
+👉 err.issues === undefined 说明：你拿到的根本不是 ZodError（也不是它的 cause）
+
+我们一步一步把问题定位清楚（这是 AWS + middy + powertools 最容易踩的坑之一）。
+
+⸻
+
+🔥 结论先说
+
+👉 你的 error.cause 并不是 ZodError
+
+而是：
+
+ParseError (但没有带 ZodError cause)
+
+
+⸻
+
+🧠 1. 为什么会这样？
+
+AWS Lambda Powertools Parser 的 parser() 有两种失败情况：
+
+⸻
+
+✅ 情况 1：Schema 校验失败（你想要的）
+
+{
+  "name": "ParseError",
+  "cause": {
+    "issues": [...]
+  }
+}
+
+👉 这里才有 ZodError
+
+⸻
+
+❌ 情况 2：JSON 解析失败 / body 不是 object（你现在的情况）
+
+比如：
+
+"body": "invalid json"
+
+或者：
+
+body: undefined / null / ""
+
+👉 抛的是：
+
+{
+  "name": "ParseError",
+  "message": "Invalid JSON"
+}
+
+🚨 没有 cause
+👉 所以：
+
+err.issues === undefined
+
+
+⸻
+
+🔍 2. 你当前最可能的问题
+
+你写了：
+
+const body = JSON.parse(event.body || '{}');
+
+但你又用了：
+
+.use(parser({ schema: options.requestSchema }))
+
+👉 ❗ 冲突了！！！
+
+⸻
+
+💥 3. 核心问题（非常重要）
+
+👉 你现在是：
+
+手动 JSON.parse ❌
++ parser middleware ❌
+
+👉 正确应该是：
+
+只用 parser ✅
+
+
+⸻
+
+✅ 4. 正确写法（必须改）
+
+❌ 删除这一行
+
+const body = JSON.parse(event.body || '{}');
+
+
+⸻
+
+✅ handler 应该这样写
+
+const handler = async (
+  event: output<typeof UserSchema>,
+): Promise<APIGatewayProxyResult> => {
+  // 💡 event 已经是 parsed + validated 了
+  const result = await createUser(event);
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify(result),
+  };
+};
+
+
+⸻
+
+🧪 5. 为什么你拿不到 issues
+
+因为你现在流程是：
+
+event.body (string)
+ → 你手动 JSON.parse
+ → parser 再 parse（但结构不对）
+ → 抛 ParseError（无 cause）
+
+
+⸻
+
+🔥 6. 正确 error handler（最终版）
+
+const isZodError = (err: any): boolean => {
+  return err && Array.isArray(err.issues);
+};
+
+export const handleApiErrors = (): MiddlewareObj => {
+  return {
+    onError: (request) => {
+      const error = request.error;
+      const cause = (error as any)?.cause;
+
+      // ✅ Zod validation error
+      if (isZodError(cause)) {
+        request.response = {
+          statusCode: 400,
+          body: JSON.stringify({
+            message: 'Validation Failed',
+            errors: cause.issues,
+          }),
+        };
+        return;
+      }
+
+      // ✅ JSON parse error
+      if (error?.name === 'ParseError') {
+        request.response = {
+          statusCode: 400,
+          body: JSON.stringify({
+            message: 'Invalid JSON format',
+          }),
+        };
+        return;
+      }
+
+      // ✅ fallback
+      request.response = {
+        statusCode: 500,
+        body: JSON.stringify({
+          message: 'Internal Server Error',
+        }),
+      };
+    },
+  };
+};
+
+
+⸻
+
+🧠 7. 一句话理解
+
+你现在的问题 = parser + JSON.parse 冲突
+
+
+⸻
+
+🚀 8. 正确架构（你应该这样）
+
+API Gateway
+ → middy
+ → parser (Zod validation)
+ → handler（直接用 event）
+ → response validation
+ → error handler
+
+
+⸻
+
+✅ 9. 最终 Checklist
+
+✔ 删除手动 JSON.parse
+✔ handler 用 event 直接当 DTO
+✔ error 从 error.cause 取
+✔ 用结构判断，不用 instanceof
+
+⸻
+
+💡 如果你想更进一步
+
+我可以帮你升级到👇：
+
+✅ 自动类型推导（handler 无需写类型）
+✅ request/response fully typed
+✅ OpenAPI 自动生成
+✅ 类似 Spring @Controller 风格
+标准 error format

@@ -1,0 +1,31 @@
+//@awshost = https://lk4713f0ta.execute-api.us-east-1.amazonaws.com
+@awshost = https://d4yr1pdcs1.execute-api.us-east-1.amazonaws.com
+
+# Create User
+POST {{awshost}}/dev/user
+content-type: application/json
+
+{
+    "name": "test user name",
+    "email": "test@test.com"
+}
+
+###
+# Create user - Invalid email
+POST {{awshost}}/dev/user
+content-type: application/json
+
+{
+    "name": "test user name",
+    "email": "test"
+}
+
+###
+# Create user - Invalid name & email
+POST {{awshost}}/dev/user
+content-type: application/json
+
+{
+    "name": "1",
+    "email": "2"
+}
