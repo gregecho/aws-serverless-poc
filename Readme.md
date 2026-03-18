@@ -1,155 +1,121 @@
-# Project Name
+# AWS Serverless Modernization POC (TypeScript)
 
-Serverless AWS Lambda project with Middy middleware, DynamoDB, and TypeScript, tested with Vitest.
+> **A production-ready Serverless architecture utilizing TypeScript, Middy, and DynamoDB, following Onion/Clean Architecture principles.**
 
-⸻
+---
 
-Description
+## 📖 Project Overview
 
-This project demonstrates a Serverless architecture using AWS Lambda and DynamoDB. It includes:
-• API Gateway REST endpoints
-• Lambda handlers using Middy middleware for input validation, error handling, and JSON parsing
-• Repository-Service-Handler structure following Onion/Clean architecture
-• Input validation with Zod
-• Unit and integration testing using Vitest
-• Local DynamoDB mocking for tests
+This project is a high-quality **Proof of Concept (POC)** built with the **Serverless Framework**. It demonstrates how to build maintainable, scalable, and testable cloud-native applications on AWS.
 
-⸻
+Beyond a simple Lambda function, this repository showcases a robust enterprise-grade structure focusing on **separation of concerns**, **runtime validation**, and **automated testing**.
 
-Architecture
-• Handler Layer: Handles API Gateway events, uses Middy for middleware.
-• Service Layer: Contains business logic, calls repository methods.
-• Repository Layer: Interacts with DynamoDB.
-• Middleware: Handles validation, error formatting, JSON parsing.
+### Key Features
 
-API Gateway --> Lambda Handler --> Service --> Repository --> DynamoDB
-|
---> Middy Middleware (validation, error handling)
+- **Onion Architecture**: Strict separation between Handlers, Services, and Repositories.
+- **Type Safety**: End-to-end TypeScript implementation with **Zod** for runtime schema validation.
+- **Robust Middleware**: Powered by **Middy** for centralized JSON parsing, input validation, and standardized error handling.
+- **Comprehensive Testing**: Full test suite using **Vitest** with local DynamoDB mocking.
 
-⸻
+---
 
-Technologies
-• Language: TypeScript
-• Framework: Serverless Framework
-• Middleware: Middy
-• Validation: Zod
-• Database: DynamoDB (AWS)
-• Testing: Vitest, Faker.js
-• AWS SDK: @aws-sdk/lib-dynamodb
+## 🏗️ Architecture Design
 
-⸻
+The project follows the **Onion/Clean Architecture** pattern to ensure the business logic remains independent of external infrastructure (AWS SDK, Database).
 
-Installation
+### Data Flow
 
-# Install dependencies
+`API Gateway` ➔ `Middy Middleware` ➔ `Lambda Handler` ➔ `Service Layer` ➔ `Repository Layer` ➔ `DynamoDB`
 
-npm install
+- **Handler Layer**: Pure entry point. Adapts API Gateway events and manages middleware.
+- **Service Layer**: The "Brain." Contains core business logic and rules.
+- **Repository Layer**: Data access abstraction. Interacts with the DynamoDB client.
+- **Middleware Stack**: Handles cross-cutting concerns (Validation, HTTP Error Formatting).
 
-# or
+---
 
-pnpm install
+## 🛠️ Tech Stack
 
-⸻
+| Category       | Technology                           |
+| :------------- | :----------------------------------- |
+| **Language**   | TypeScript                           |
+| **Framework**  | Serverless Framework                 |
+| **Middleware** | Middy (@middy/core)                  |
+| **Validation** | Zod                                  |
+| **Database**   | AWS DynamoDB (@aws-sdk/lib-dynamodb) |
+| **Testing**    | Vitest, Faker.js                     |
 
-Environment Variables
+---
 
-Create a .env file:
+## 📂 Project Structure
 
-USERS_TABLE=your-dynamodb-table
-AWS_REGION=your-region
-
-    •	USERS_TABLE – DynamoDB table name for users
-    •	AWS_REGION – AWS region
-
-⸻
-
-Serverless Deployment
-
-# Deploy to AWS
-
-npx serverless deploy
-
-# Invoke a function
-
-npx serverless invoke -f create-user --data '{"name": "John", "email": "john@example.com"}'
-
-# Remove deployment
-
-npx serverless remove
-
-⸻
-
-Running Locally
-
-You can test Lambda handlers locally:
-
-# Start local server
-
-npx serverless offline
-
-# Or invoke function locally
-
-npx serverless invoke local -f create-user --data '{"name": "John", "email": "john@example.com"}'
-
-⸻
-
-Testing
-
-Unit and integration tests are written with Vitest.
-
-# Run all tests
-
-npm run test
-
-# Run unit tests only
-
-npm run test:unit
-
-# Run integration tests only
-
-npm run test:integration
-
-# Run tests with coverage
-
-npm run test:coverage
-
-    •	Unit tests: Mock dependencies like DynamoDB and services
-    •	Integration tests: Test Lambda handlers with actual middleware behavior
-    •	Mocks: Use vi.mock or vi.spyOn for dependencies
-
-⸻
-
-Project Structure
-
+```text
 src/
-├─ clients/ # AWS clients (DynamoDB, etc.)
-├─ handlers/ # Lambda handlers
+├─ clients/      # AWS Client initializations (DynamoDB, etc.)
+├─ handlers/     # Lambda entry points (Event parsing & response)
 │ └─ user/
 │ └─ create-user-handler.ts
-├─ repositories/ # Repository layer (DB access)
-│ └─ user/
-├─ services/ # Service layer (business logic)
-├─ schemas/ # Zod schemas
-├─ tests/
-│ ├─ unit/
-│ └─ integration/
-└─ utils/ # Helpers & middleware
+├─ services/     # Business logic layer (Framework-agnostic)
+├─ repositories/ # Data access layer (Persistence logic)
+├─ schemas/      # Zod validation schemas
+├─ utils/        # Helpers and custom middleware
+└─ tests/        # Unit & Integration test suites
+```
 
-⸻
+## 🚀 Quick Start
 
-Contributing 1. Fork the repository 2. Create a feature branch (git checkout -b feature/my-feature) 3. Commit your changes (git commit -m 'Add some feature') 4. Push to the branch (git push origin feature/my-feature) 5. Create a pull request
+### 1. Installation
 
-⸻
+```bash
+npm install
+# or
+pnpm install
+```
 
-License
+### 2. Environment Configuration
 
-MIT License © 2026
+Create a .env file in the root directory:
 
-⸻
+```typescript
+USERS_TABLE = your - dynamodb - table;
+AWS_REGION = your - region;
+```
 
-I can also generate a more detailed README that includes:
-• Example API request/response for create-user
-• Error responses (400, 500, invalid JSON)
-• Example of mocking in unit/integration tests
+### 3. Local Development & Testing
 
-Do you want me to do that next?
+```bash
+# Start local simulation
+npx serverless offline
+
+# Invoke a function locally
+npx serverless invoke local -f create-user --data '{"name": "John", "email": "john@example.com"}'
+
+# Run all tests with coverage
+npm run test:coverage
+```
+
+### 4. Deployment
+
+```bash
+npx serverless deploy
+```
+
+### 🧪 Testing Strategy
+
+We employ a dual-layered testing strategy to ensure reliability:
+
+- Unit Tests: Focus on the Service Layer. Dependencies like DynamoDB are isolated using vi.mock to test business logic in a pure environment.
+
+- Integration Tests: Test the Lambda Handler end-to-end, including the behavior of the Middy middleware stack (validation, parsing, and error interception).
+
+- Mocking: Utilizes Faker.js for realistic data generation and vi.spyOn for dependency tracking.
+
+## 📈 Roadmap & TODOs
+
+- [ ] Observability: Integrate AWS X-Ray for distributed tracing and CloudWatch Metrics.
+
+- [ ] CI/CD: Implementation of GitHub Actions for automated Linting, Testing, and Deployment.
+
+- [ ] API Documentation: Automatic Swagger/OpenAPI generation from Zod schemas.
+
+- [ ] Security: Implementation of AWS Secrets Manager for environment variable protection.
