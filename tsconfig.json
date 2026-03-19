@@ -14,7 +14,8 @@
       "@@schemas/*": ["./src/schemas/*"],
       "@@repositories/*": ["./src/repositories/*"],
       "@@middleware/*": ["./src/middleware/*"],
-      "@@services/*": ["./src/services/*"]
+      "@@services/*": ["./src/services/*"],
+      "@@utils/*": ["./src/utils/*"]
     }
   }
 }

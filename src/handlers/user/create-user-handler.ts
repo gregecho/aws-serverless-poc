@@ -4,8 +4,8 @@ import {
   userRequestSchema,
   userResponseSchema,
 } from '@@schemas/user/userSchema';
+import { createUserService } from '@@services/user/userService';
 import { Logger } from '@aws-lambda-powertools/logger';
-import { createUserService } from '../../services/user/userService';
 
 const logger = new Logger({
   serviceName: 'createUser',

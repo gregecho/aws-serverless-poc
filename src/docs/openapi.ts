@@ -2,7 +2,7 @@ import { OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { registry } from './registry';
 
 // Use different docs for each api
-import './user.docs';
+import './user/user.docs';
 //import './product.docs'//other docs
 
 export function getOpenApiDocumentation() {

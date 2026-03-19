@@ -1,4 +1,7 @@
 node_modules
 .serverless
 .dynamodb
+dist/
 dist
+openapi.yaml
+index.html

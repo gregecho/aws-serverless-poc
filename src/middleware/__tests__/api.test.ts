@@ -1,4 +1,5 @@
 import { handleApiErrors } from '@@middleware/api';
+import { Errors } from '@@utils/errors';
 import { describe, expect, test } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -28,6 +29,21 @@ describe('handleApiErrors middleware', () => {
     const body = JSON.parse(request.response.body);
     expect(body.message).toBe('Validation Failed');
     expect(body.errors[0].path).toBe('email');
+  });
+
+  test('should handled by AppError if appError is throwed', async () => {
+    const appError = Errors.BAD_REQUEST('test bad request');
+    const request: any = {
+      error: appError,
+    };
+
+    await middleware.onError!(request);
+    expect(request.response.statusCode).toBe(400);
+
+    const body = JSON.parse(request.response.body);
+    expect(body.message).toBe('test bad request');
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('INVALID_INPUT');
   });
 
   test('should return 400 for direct ZodError', async () => {

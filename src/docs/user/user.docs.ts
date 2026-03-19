@@ -2,7 +2,8 @@ import {
   userRequestSchema,
   userResponseSchema,
 } from '@@schemas/user/userSchema';
-import { registry } from './registry';
+import { commonErrors } from '../common.errors';
+import { registry } from '../registry';
 
 registry.registerPath({
   method: 'post',
@@ -21,5 +22,6 @@ registry.registerPath({
       description: 'create user success',
       content: { 'application/json': { schema: userResponseSchema } },
     },
+    ...commonErrors,
   },
 });

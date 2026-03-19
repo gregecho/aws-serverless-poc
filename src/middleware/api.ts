@@ -2,6 +2,7 @@ import middy, { MiddlewareObj } from '@middy/core';
 import httpJsonBodyParser from '@middy/http-json-body-parser';
 import { Context } from 'aws-lambda';
 import { output, ZodError, ZodType } from 'zod';
+import { AppError } from '../utils/errors';
 
 /**
  * Middy-enabled handler for API Gateway Proxy Lambda handlers
@@ -63,7 +64,23 @@ export const handleApiErrors = (): MiddlewareObj => {
       const error = request.error as any;
       const cause = error?.cause;
 
-      //1. Try to identify zodError
+      // 1. Handle business error
+      if (error instanceof AppError) {
+        request.response = {
+          statusCode: error.statusCode,
+          body: JSON.stringify({
+            success: false,
+            message: error.message,
+            error: {
+              code: error.errorCode,
+              details: error.details,
+            },
+          }),
+        };
+        return;
+      }
+
+      //2. Try to identify zodError
       if (isZodError(error)) return buildZodResponse(error, request);
       if (isZodError(cause)) return buildZodResponse(cause, request);
 

@@ -117,6 +117,23 @@ pnpm docs:preview
 pnpm docs:build
 ```
 
+### ⚠️ Error Handling
+
+All error responses follow a consistent structure:
+
+| Field           | Type      | Description                                            |
+| :-------------- | :-------- | :----------------------------------------------------- |
+| `success`       | `boolean` | Always `false` for error responses.                    |
+| `error.code`    | `string`  | A machine-readable error code (e.g., `INVALID_INPUT`). |
+| `error.message` | `string`  | A human-readable error description.                    |
+
+#### Common HTTP Status Codes
+
+- `400`: Validation error or bad request.
+- `401`: Unauthorized / Token missing.
+- `404`: Resource not found.
+- `500`: Internal server error.
+
 ### 🧪 Testing Strategy
 
 We employ a dual-layered testing strategy to ensure reliability:
@@ -180,10 +197,11 @@ const UserResponse = BaseUser.extend({
 - [x] API Documentation: Automatic Swagger/OpenAPI generation from Zod schemas.
 
 - [ ] Security: Implementation of AWS Secrets Manager for environment variable protection.
-- [ ] 集成 AWS X-Ray: 引入分布式链路追踪，提升 Serverless 环境下的可观测性。
-- [ ] 异步解耦: 在核心链路中引入 Amazon SQS，实现异步任务的削峰填谷。
-- [ ] Local Simulation: 引入 LocalStack，实现无需联网即可在 Docker 中模拟全套 AWS 环境进行测试。
-- [ ] Performance Benchmarking: 编写一个脚本，对比不同内存配置（128MB vs 1024MB）下 Lambda 的执行效率与成本差异。
-- [ ] 精细化异常处理：实现一个全局的 Lambda Error Handler，并对接 CloudWatch Alarms。
-- [ ] 全局异常定义
+- [ ] AWS X-Ray Integration: Implement distributed tracing to enhance observability and identify bottlenecks within the Serverless environment.
+- [ ] Asynchronous Decoupling: Integrate Amazon SQS into core workflows to decouple services and achieve "load leveling" (shaving peaks and filling valleys) for background tasks.
+- [ ] Local Simulation with LocalStack: Set up LocalStack in a Docker environment to simulate a full suite of AWS services locally, enabling offline development and testing.
+- [ ] Performance Benchmarking: Develop a script to perform Lambda Power Tuning—comparing execution efficiency and cost-effectiveness across different memory configurations (e.g., 128MB vs. 1024MB).
+- [x] Refined Exception Handling: Implement a centralized Lambda Error Handler middleware.
+- [x] Global Exception Definitions: Standardize error schemas across the project to ensure consistent API responses and seamless integration with frontend error boundaries.
+- [ ] Logging
 - [ ] Just
