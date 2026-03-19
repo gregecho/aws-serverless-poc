@@ -10,7 +10,10 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "build": "tsc",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "docs:gen": "tsx ./src/docs/gen-docs.ts",
+    "docs:preview": "pnpm docs:gen && redocly preview",
+    "docs:build": "pnpm docs:gen && redocly build-docs openapi.yaml -o index.html"
   },
   "keywords": [],
   "author": "",
@@ -34,6 +37,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
+    "@redocly/cli": "^2.24.0",
     "@serverless/typescript": "^4.30.0",
     "@types/aws-lambda": "^8.10.161",
     "@types/node": "^25.5.0",
@@ -42,8 +46,10 @@
     "serverless": "^4.33.0",
     "serverless-dynamodb": "^0.2.56",
     "serverless-offline": "^14.5.0",
+    "swagger-ui-dist": "^5.32.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "yaml": "^2.8.2"
   }
 }

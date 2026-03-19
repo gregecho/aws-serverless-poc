@@ -1,0 +1,76 @@
+openapi: 3.0.0
+info:
+  title: Greg test api
+  version: 1.0.0
+tags:
+  - name: User
+    description: "User "
+components:
+  schemas:
+    UserResponse:
+      allOf:
+        - $ref: "#/components/schemas/BaseUser"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: user id
+            createdAt:
+              type: string
+              description: User created at
+              example: 1900-01-01
+          required:
+            - id
+            - createdAt
+    BaseUser:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          description: user name
+          example: first name
+        email:
+          type: string
+          format: email
+          description: users email
+          example: test@test.com
+      required:
+        - name
+        - email
+    UserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          description: user name
+          example: first name
+        email:
+          type: string
+          format: email
+          description: users email
+          example: test@test.com
+      required:
+        - name
+        - email
+  parameters: {}
+paths:
+  /user:
+    post:
+      tags:
+        - User
+      summary: Create new user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRequest"
+      responses:
+        "200":
+          description: create user success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
