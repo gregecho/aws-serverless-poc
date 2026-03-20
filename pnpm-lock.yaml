@@ -32,6 +32,9 @@ importers:
       '@middy/http-error-handler':
         specifier: ^7.1.7
         version: 7.1.7
+      '@middy/http-header-normalizer':
+        specifier: ^7.2.1
+        version: 7.2.1
       '@middy/http-json-body-parser':
         specifier: ^7.1.7
         version: 7.1.7
@@ -650,6 +653,10 @@ packages:
 
   '@middy/http-error-handler@7.1.7':
     resolution: {integrity: sha512-ZKxQB6NGZzSv5sSrgKnvp+FSoevCMZSyhUe8COajUM2fQXyiET6FGqwkY/mbUZcrrBjd62l9dfUv9ZqaHm+CBg==, tarball: https://registry.npmjs.org/@middy/http-error-handler/-/http-error-handler-7.1.7.tgz}
+    engines: {node: '>=22'}
+
+  '@middy/http-header-normalizer@7.2.1':
+    resolution: {integrity: sha512-dCne3FMDbdMzhYt4MEOoIHm8R47N0ooPNdU1JleeReWZtp7u54VbMET0C16GChVmbdCVFk/4IxDtM2nY+IHx1w==, tarball: https://registry.npmjs.org/@middy/http-header-normalizer/-/http-header-normalizer-7.2.1.tgz}
     engines: {node: '>=22'}
 
   '@middy/http-json-body-parser@7.1.7':
@@ -3627,6 +3634,8 @@ snapshots:
   '@middy/http-error-handler@7.1.7':
     dependencies:
       '@middy/util': 7.1.7
+
+  '@middy/http-header-normalizer@7.2.1': {}
 
   '@middy/http-json-body-parser@7.1.7':
     dependencies:

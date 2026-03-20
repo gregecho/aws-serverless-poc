@@ -7,6 +7,10 @@ export class UserService {
   async createUser(user: UserBody): Promise<UserResponse> {
     return this.repository.save(user);
   }
+
+  async getUser(userId: string): Promise<UserResponse> {
+    return this.repository.get(userId);
+  }
 }
 
 export function createUserService(repository: UserRepository) {

@@ -12,7 +12,9 @@ const serverlessConfiguration: AWS = {
     region: 'us-east-1',
 
     environment: {
-      USERS_TABLE: 'users-table',
+      // DO NOT hardcode any resource
+      //aws-serverless-poc-users-table-dev
+      USERS_TABLE: '${self:service}-users-table-${sls:stage}',
     },
 
     iam: {
@@ -20,8 +22,22 @@ const serverlessConfiguration: AWS = {
         statements: [
           {
             Effect: 'Allow',
-            Action: ['dynamodb:PutItem', 'dynamodb:GetItem'],
-            Resource: ['arn:aws:dynamodb:*:*:table/users-table'],
+            Action: [
+              'dynamodb:PutItem',
+              'dynamodb:GetItem',
+              'dynamodb:UpdateItem',
+              'dynamodb:Query',
+            ],
+            Resource: [
+              { 'Fn::GetAtt': ['UsersTable', 'Arn'] },
+              // Permission for index
+              {
+                'Fn::Join': [
+                  '/',
+                  [{ 'Fn::GetAtt': ['UsersTable', 'Arn'] }, 'index/*'],
+                ],
+              },
+            ],
           },
         ],
       },
@@ -38,25 +54,37 @@ const serverlessConfiguration: AWS = {
     Resources: {
       UsersTable: {
         Type: 'AWS::DynamoDB::Table',
-
         Properties: {
-          TableName: 'users-table',
-
+          TableName: '${self:provider.environment.USERS_TABLE}',
+          BillingMode: 'PAY_PER_REQUEST',
           AttributeDefinitions: [
             {
-              AttributeName: 'id',
+              AttributeName: 'PK',
               AttributeType: 'S',
             },
+            {
+              AttributeName: 'SK',
+              AttributeType: 'S',
+            },
+            { AttributeName: 'Email', AttributeType: 'S' },
           ],
-
           KeySchema: [
             {
-              AttributeName: 'id',
+              AttributeName: 'PK',
               KeyType: 'HASH',
             },
+            {
+              AttributeName: 'SK',
+              KeyType: 'RANGE',
+            },
           ],
-
-          BillingMode: 'PAY_PER_REQUEST',
+          GlobalSecondaryIndexes: [
+            {
+              IndexName: 'EmailIndex',
+              KeySchema: [{ AttributeName: 'Email', KeyType: 'HASH' }],
+              Projection: { ProjectionType: 'ALL' },
+            },
+          ],
         },
       },
     },

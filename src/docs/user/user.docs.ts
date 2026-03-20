@@ -2,7 +2,7 @@ import {
   userRequestSchema,
   userResponseSchema,
 } from '@@schemas/user/userSchema';
-import { commonErrors } from '../common.errors';
+import { commonErrors, commonGetErrors } from '../common.errors';
 import { registry } from '../registry';
 
 registry.registerPath({
@@ -23,5 +23,19 @@ registry.registerPath({
       content: { 'application/json': { schema: userResponseSchema } },
     },
     ...commonErrors,
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/users/{id}',
+  tags: ['User'],
+  summary: 'Get user by ID',
+  responses: {
+    200: {
+      description: 'Success',
+      content: { 'application/json': { schema: userResponseSchema } },
+    },
+    ...commonGetErrors,
   },
 });

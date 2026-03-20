@@ -28,6 +28,7 @@
     "@aws-sdk/lib-dynamodb": "^3.1010.0",
     "@middy/core": "^7.1.7",
     "@middy/http-error-handler": "^7.1.7",
+    "@middy/http-header-normalizer": "^7.2.1",
     "@middy/http-json-body-parser": "^7.1.7",
     "add": "^2.0.6",
     "axios": "^1.13.6",

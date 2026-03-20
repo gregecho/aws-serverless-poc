@@ -29,3 +29,17 @@ content-type: application/json
     "name": "1",
     "email": "2"
 }
+
+###
+# Create user - Invalid json
+POST {{awshost}}/dev/user
+content-type: application/json
+
+{
+    123
+}
+
+###
+# Get user by userId
+GET {{awshost}}/dev/user/f1fc2237-6614-4312-9ba9-a465f8c9fc0c
+content-type: application/json

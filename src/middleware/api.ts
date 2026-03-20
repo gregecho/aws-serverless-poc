@@ -1,6 +1,7 @@
+import { parser } from '@aws-lambda-powertools/parser/middleware';
 import middy, { MiddlewareObj } from '@middy/core';
-import httpJsonBodyParser from '@middy/http-json-body-parser';
-import { Context } from 'aws-lambda';
+import httpHeaderNormalizer from '@middy/http-header-normalizer';
+import { APIGatewayProxyEvent, Context } from 'aws-lambda';
 import { output, ZodError, ZodType } from 'zod';
 import { AppError } from '../utils/errors';
 
@@ -11,19 +12,21 @@ export const restApiHandler = <R extends ZodType, T extends ZodType>(options: {
   requestSchema: R;
   responseSchema?: T;
 }) => {
-  const wrapper = middy()
-    .use(httpJsonBodyParser())
-    .use({
-      before: (request) => {
-        // Parese body and set the validated body back
-        try {
-          request.event.body = options.requestSchema.parse(request.event.body);
-        } catch (e) {
-          throw e;
-        }
-      },
-    })
-    .use(handleApiErrors());
+  const wrapper = middy();
+  //wrapper.use(httpJsonBodyParser());
+  wrapper.use(httpHeaderNormalizer());
+
+  wrapper.use({
+    before: (request) => {
+      const target = getValidationTarget(request.event);
+      // 将处理后的数据存回 event.body 供 parser 消费
+      request.event.body = target;
+    },
+  });
+
+  wrapper.use(parser({ schema: options.requestSchema }));
+
+  wrapper.use(handleApiErrors());
 
   if (options.responseSchema) {
     wrapper.use(validateResponse(options.responseSchema));
@@ -36,6 +39,20 @@ export const restApiHandler = <R extends ZodType, T extends ZodType>(options: {
       });
     },
   };
+};
+
+/**
+ * 核心优化：自动识别校验源
+ * GET/DELETE 校验 pathParameters，POST/PUT/PATCH 校验 body
+ */
+const getValidationTarget = (event: APIGatewayProxyEvent) => {
+  const method = event.httpMethod?.toUpperCase();
+  if (['GET', 'DELETE'].includes(method)) {
+    // 合并路径参数和查询参数进行统一校验
+    return { ...event.pathParameters, ...event.queryStringParameters };
+  }
+  // 对于有 Body 的请求，如果是字符串则尝试解析（兼容手动模拟 event 的情况）
+  return typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 };
 
 export const validateResponse = (schema: ZodType): MiddlewareObj => {

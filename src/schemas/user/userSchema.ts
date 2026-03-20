@@ -36,6 +36,14 @@ export const updateUserRequestSchema = baseUserSchema
 
 export const userRequestSchema = baseUserSchema.openapi('UserRequest');
 
+export const getUserRequestSchema = z.object({
+  pathParameters: z.object({
+    userId: z.string().describe('unique identifier of user to retrieve').meta({
+      example: '123-123-123-12345',
+    }),
+  }),
+});
+
 export type UserResponse = z.infer<typeof userResponseSchema>;
 export type UserRequest = z.infer<typeof userRequestSchema>;
 export type UserBody = z.infer<typeof baseUserSchema>;
