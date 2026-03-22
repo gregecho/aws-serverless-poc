@@ -205,3 +205,4 @@ const UserResponse = BaseUser.extend({
 - [x] Global Exception Definitions: Standardize error schemas across the project to ensure consistent API responses and seamless integration with frontend error boundaries.
 - [ ] Logging
 - [ ] Just
+- [ ] Auto openapi in middleware

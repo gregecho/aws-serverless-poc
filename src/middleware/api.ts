@@ -1,129 +1,235 @@
+/**
+ * Core middleware utilities for API Gateway Lambda handlers.
+ *
+ * This module provides:
+ * - Request validation via Zod schemas
+ * - Centralized error handling
+ * - Automatic response normalization
+ */
+
+import { AppError } from '@@utils/errors';
 import middy, { MiddlewareObj } from '@middy/core';
 import httpJsonBodyParser from '@middy/http-json-body-parser';
-import { Context } from 'aws-lambda';
-import { output, ZodError, ZodType } from 'zod';
-import { AppError } from '../utils/errors';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import z, { output, ZodError, ZodNever, ZodType } from 'zod';
+import { ApiErrorBody, HandlerInput, Schemas } from './types';
+
+/**
+ * Middleware to validate and transform incoming API Gateway request data using Zod schemas.
+ *
+ * This middleware runs in the "before" phase and parses the incoming request:
+ * - body: Parses JSON request body into a typed object
+ * - query: Validates and transforms query string parameters
+ * - path: Validates and transforms path parameters
+ *
+ * If validation fails, a ZodError will be thrown and handled by downstream error middleware.
+ *
+ * @param schemas - Optional Zod schemas for body, query, and path validation
+ * @returns Middy middleware object
+ */
+export const zodValidationMiddleware = (
+  schemas: Schemas,
+): MiddlewareObj<APIGatewayProxyEvent, APIGatewayProxyResult> => {
+  return {
+    before: async (request) => {
+      const { event } = request;
+
+      if (schemas.body && event.body !== null) {
+        event.body = schemas.body.parse(event.body) as any;
+      }
+
+      if (schemas.query && event.queryStringParameters) {
+        event.queryStringParameters = schemas.query.parse(
+          event.queryStringParameters ?? {},
+        ) as any;
+      }
+
+      if (schemas.path && event.pathParameters) {
+        event.pathParameters = schemas.path.parse(
+          event.pathParameters ?? {},
+        ) as any;
+      }
+    },
+  };
+};
+
+/**
+ * Validates the handler's raw return value against a Zod schema.
+ * Must run BEFORE responseMiddleware wraps the response.
+ * (Middy "after" hooks run in reverse registration order)
+ */
+export const zodValidationResponseMiddleware = (
+  schema: ZodType,
+): MiddlewareObj => {
+  return {
+    after: (request) => {
+      const { response } = request;
+      // At this point, response is still the raw value from the handler
+      // responseMiddleware hasn't wrapped it yet (runs after this in reverse order)
+      schema.parse(response);
+    },
+  };
+};
+
+/**
+ * Global error handling middleware for API Gateway Lambda handlers.
+ *
+ * This middleware catches all errors thrown during request processing
+ * and maps them into standardized HTTP responses.
+ *
+ * Error mapping:
+ * - ZodError           → 400 VALIDATION_ERROR
+ * - AppError           → AppError.statusCode + AppError.errorCode
+ * - ParseError         → 400 INVALID_JSON
+ * - Unknown            → 500 INTERNAL_ERROR
+ *
+ * This ensures consistent error responses across all handlers.
+ *
+ * @returns Middy middleware object
+ */
+export const errorHandler = (): MiddlewareObj<
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult
+> => ({
+  onError: async (request) => {
+    const error = request.error as any;
+
+    // ZodError
+    if (error instanceof ZodError) {
+      request.response = jsonResponse(
+        400,
+        errorBody('VALIDATION_ERROR', 'Validation failed', error.issues),
+      );
+      return;
+    }
+
+    // Handle business error
+    if (error instanceof AppError) {
+      request.response = jsonResponse(
+        error.statusCode,
+        errorBody(error.errorCode, error.message, error.details),
+      );
+      return;
+    }
+
+    // Parse error
+    if (
+      error?.name === 'ParseError' ||
+      error?.name === 'UnprocessableEntityError'
+    ) {
+      request.response = jsonResponse(
+        400,
+        errorBody('INVALID_JSON', 'Invalid JSON format', error.message),
+      );
+      return;
+    }
+
+    // Other
+    request.response = jsonResponse(
+      500,
+      errorBody('INTERNAL_ERROR', error?.message || 'Internal Server Error'),
+    );
+  },
+});
+
+/**
+ * Factory for type-safe API Gateway Lambda handlers with Zod validation.
+ *
+ * Middleware execution order:
+ *   before: httpJsonBodyParser → zodValidation → handler
+ *   after:  zodValidationResponse → responseMiddleware   (reverse registration)
+ *   error:  errorHandler
+ *
+ * @returns Middy middleware object
+ *
+ * @example
+ * export const handler = restApiHandler({
+ *   body: CreateUserSchema,
+ *   response: UserResponseSchema,
+ * }).handler(async ({ body }) => {
+ *   return createUser(body);
+ * });
+ */
+const responseMiddleware = (): MiddlewareObj<
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult
+> => ({
+  after: async (request) => {
+    const res = request.response;
+
+    // Return directly if res is standard
+    if (res?.statusCode) return;
+
+    request.response = jsonResponse(200, {
+      success: true,
+      data: res ?? {},
+    });
+  },
+});
+
+const jsonResponse = (
+  statusCode: number,
+  body: unknown,
+): APIGatewayProxyResult => ({
+  statusCode,
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+const errorBody = (
+  code: string,
+  message: string,
+  details?: unknown,
+): ApiErrorBody => ({
+  success: false,
+  error: { code, message, ...(details !== undefined && { details }) },
+});
 
 /**
  * Middy-enabled handler for API Gateway Proxy Lambda handlers
  */
-export const restApiHandler = <R extends ZodType, T extends ZodType>(options: {
-  requestSchema: R;
-  responseSchema?: T;
+export const restApiHandler = <
+  B extends ZodType = ZodNever, // Default to ZodNever sine it's optional
+  Q extends ZodType = ZodNever,
+  P extends ZodType = ZodNever,
+  R extends ZodType = ZodNever,
+>(options: {
+  body?: B;
+  query?: Q;
+  path?: P;
+  response?: R;
 }) => {
   const wrapper = middy()
     .use(httpJsonBodyParser())
-    .use({
-      before: (request) => {
-        // Parese body and set the validated body back
-        try {
-          request.event.body = options.requestSchema.parse(request.event.body);
-        } catch (e) {
-          throw e;
-        }
-      },
-    })
-    .use(handleApiErrors());
+    .use(
+      zodValidationMiddleware({
+        body: options.body,
+        query: options.query,
+        path: options.path,
+      }),
+    )
+    .use(errorHandler())
+    .use(responseMiddleware());
 
-  if (options.responseSchema) {
-    wrapper.use(validateResponse(options.responseSchema));
+  if (options.response) {
+    wrapper.use(zodValidationResponseMiddleware(options.response));
   }
 
   return {
-    handler: (handler: (body: output<R>, context: Context) => Promise<any>) => {
-      return wrapper.handler(async (event: any, context: Context) => {
-        return handler(event.body, context);
+    handler: (
+      handler: (
+        input: HandlerInput<z.infer<B>, z.infer<Q>, z.infer<P>>,
+      ) => Promise<[R] extends [ZodNever] ? any : z.infer<R>>, // If need type depends on response
+    ) => {
+      return wrapper.handler(async (event, context) => {
+        const input = {
+          body: event.body as output<B>,
+          query: event.queryStringParameters as output<Q>,
+          path: event.pathParameters as output<P>,
+          context,
+        };
+        return handler(input);
       });
     },
-  };
-};
-
-export const validateResponse = (schema: ZodType): MiddlewareObj => {
-  return {
-    after: (request) => {
-      const { response } = request;
-      if (response?.body) {
-        try {
-          const data =
-            typeof response.body === 'string'
-              ? JSON.parse(response.body)
-              : response.body;
-          schema.parse(data); // Throws ZodError if invalid, caught by handleApiErrors
-        } catch (e) {
-          console.error('Response Validation Error:', e);
-          throw e;
-        }
-      }
-    },
-  };
-};
-
-export const handleApiErrors = (): MiddlewareObj => {
-  return {
-    onError: (request) => {
-      const error = request.error as any;
-      const cause = error?.cause;
-
-      // 1. Handle business error
-      if (error instanceof AppError) {
-        request.response = {
-          statusCode: error.statusCode,
-          body: JSON.stringify({
-            success: false,
-            message: error.message,
-            error: {
-              code: error.errorCode,
-              details: error.details,
-            },
-          }),
-        };
-        return;
-      }
-
-      //2. Try to identify zodError
-      if (isZodError(error)) return buildZodResponse(error, request);
-      if (isZodError(cause)) return buildZodResponse(cause, request);
-
-      // 3. Parse error
-      if (
-        error?.name === 'ParseError' ||
-        error?.name === 'UnprocessableEntityError'
-      ) {
-        request.response = {
-          statusCode: 400,
-          body: JSON.stringify({
-            message: 'Invalid JSON format',
-            details: error.message,
-          }),
-        };
-        return;
-      }
-
-      // 4. Other
-      request.response = {
-        statusCode: 500,
-        body: JSON.stringify({
-          message: 'Internal Server Error',
-          error: error?.message,
-        }),
-      };
-    },
-  };
-};
-
-const isZodError = (err: any): err is ZodError => {
-  return err && Array.isArray(err.issues);
-};
-
-const buildZodResponse = (zodError: { issues: any[] }, request: any) => {
-  request.response = {
-    statusCode: 400,
-    body: JSON.stringify({
-      message: 'Validation Failed',
-      errors: zodError.issues.map((issue) => ({
-        path: Array.isArray(issue.path) ? issue.path.join('.') : issue.path,
-        message: issue.message,
-      })),
-    }),
   };
 };
