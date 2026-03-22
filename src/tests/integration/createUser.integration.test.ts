@@ -1,4 +1,4 @@
-import { handler } from '@@handlers/user/create-user-handler';
+import { createUserHandler } from '@@handlers/user/user-handler';
 import { UserService } from '@@services/user/userService';
 import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -42,7 +42,7 @@ describe('createUser API (integration)', () => {
       },
     } as any;
 
-    const response = await handler(event, {} as any);
+    const response = await createUserHandler(event, {} as any);
 
     expect(response.statusCode).toBe(200);
 
@@ -66,7 +66,7 @@ describe('createUser API (integration)', () => {
       },
     } as any;
 
-    const response = await handler(event, {} as any);
+    const response = await createUserHandler(event, {} as any);
 
     expect(response.statusCode).toBe(400);
 
@@ -86,7 +86,7 @@ describe('createUser API (integration)', () => {
       },
     } as any;
 
-    const response = await handler(event, {} as any);
+    const response = await createUserHandler(event, {} as any);
 
     expect(response.statusCode).toBe(400);
 
@@ -108,7 +108,7 @@ describe('createUser API (integration)', () => {
       },
     } as any;
 
-    const response = await handler(event, {} as any);
+    const response = await createUserHandler(event, {} as any);
 
     expect(response.statusCode).toBe(500);
 

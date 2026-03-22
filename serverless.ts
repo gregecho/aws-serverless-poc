@@ -38,6 +38,22 @@ const serverlessConfiguration: AWS = {
                 ],
               },
             ],
+            Action: [
+              'dynamodb:PutItem',
+              'dynamodb:GetItem',
+              'dynamodb:UpdateItem',
+              'dynamodb:Query',
+            ],
+            Resource: [
+              { 'Fn::GetAtt': ['UsersTable', 'Arn'] },
+              // Permission for index
+              {
+                'Fn::Join': [
+                  '/',
+                  [{ 'Fn::GetAtt': ['UsersTable', 'Arn'] }, 'index/*'],
+                ],
+              },
+            ],
           },
         ],
       },
@@ -57,8 +73,15 @@ const serverlessConfiguration: AWS = {
         Properties: {
           TableName: '${self:provider.environment.USERS_TABLE}',
           BillingMode: 'PAY_PER_REQUEST',
+          TableName: '${self:provider.environment.USERS_TABLE}',
+          BillingMode: 'PAY_PER_REQUEST',
           AttributeDefinitions: [
             {
+              AttributeName: 'PK',
+              AttributeType: 'S',
+            },
+            {
+              AttributeName: 'SK',
               AttributeName: 'PK',
               AttributeType: 'S',
             },
@@ -67,12 +90,26 @@ const serverlessConfiguration: AWS = {
               AttributeType: 'S',
             },
             { AttributeName: 'Email', AttributeType: 'S' },
+            { AttributeName: 'Email', AttributeType: 'S' },
           ],
           KeySchema: [
             {
               AttributeName: 'PK',
+              AttributeName: 'PK',
               KeyType: 'HASH',
             },
+            {
+              AttributeName: 'SK',
+              KeyType: 'RANGE',
+            },
+          ],
+          GlobalSecondaryIndexes: [
+            {
+              IndexName: 'EmailIndex',
+              KeySchema: [{ AttributeName: 'Email', KeyType: 'HASH' }],
+              Projection: { ProjectionType: 'ALL' },
+            },
+          ],
             {
               AttributeName: 'SK',
               KeyType: 'RANGE',

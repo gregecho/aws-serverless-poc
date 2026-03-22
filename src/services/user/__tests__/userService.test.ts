@@ -27,6 +27,7 @@ describe('createUser service', () => {
         id: 'mock-id',
         ...user,
       })),
+      get: vi.fn(),
     };
 
     const userService = createUserService(mockRepo);
