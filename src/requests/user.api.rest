@@ -1,8 +1,8 @@
-//@awshost = https://d4yr1pdcs1.execute-api.us-east-1.amazonaws.com
+//@awshost = https://82le3v2e59.execute-api.us-east-1.amazonaws.com
 @awshost = http://localhost:3000
 @stage   = dev
 @base    = {{awshost}}/{{stage}}/users
-@userId  = 816c5829-af67-4256-bb2e-fa10fbc4ec71
+@userId  = 1f234ee3-7145-4b43-bcb6-6627c5d3dd87
 
 # ─────────────────────────────────────────────
 # CREATE

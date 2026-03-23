@@ -5,3 +5,8 @@ dist/
 dist
 openapi.yaml
 index.html
+# Environment variables
+.env
+.env.dev
+.env.prod
+.env.local

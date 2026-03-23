@@ -1,7 +1,7 @@
 import { UserService } from '@@services/user/userService';
 import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { createUserHandler, getUserHandler } from '../user-handler';
+import { createUserHandler, getUserHandler } from '..';
 
 beforeEach(() => {
   vi.clearAllMocks();

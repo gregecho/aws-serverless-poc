@@ -15,7 +15,8 @@ const serverlessConfiguration: AWS = {
       // DO NOT hardcode any resource
       //aws-serverless-infrastructure-users-dev
       USERS_TABLE: '${self:service}-users-${sls:stage}',
-      IS_OFFLINE: 'true',
+      IS_OFFLINE: '${env:IS_OFFLINE, "false"}',
+      DYNAMODB_ENDPOINT: '${env:DYNAMODB_ENDPOINT, ""}',
     },
 
     iam: {
@@ -46,6 +47,15 @@ const serverlessConfiguration: AWS = {
   },
 
   plugins: ['serverless-offline'],
+
+  build: {
+    esbuild: {
+      bundle: true,
+      minify: false,
+      sourcemap: true,
+      exclude: ['@aws-sdk/*'],
+    },
+  },
 
   functions: {
     ...userFunctions,

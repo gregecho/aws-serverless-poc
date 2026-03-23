@@ -1,4 +1,4 @@
-import { createUserHandler } from '@@handlers/user/user-handler';
+import { createUserHandler } from '@@handlers/user';
 import { UserService } from '@@services/user/userService';
 import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, test, vi } from 'vitest';

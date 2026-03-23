@@ -1,6 +1,6 @@
 import type { AWS } from '@serverless/typescript';
 
-const base = 'src/handlers/user/user-handler';
+const base = 'src/handlers/user/index';
 const path = '/users';
 const pathWithId = `${path}/{id}`;
 
