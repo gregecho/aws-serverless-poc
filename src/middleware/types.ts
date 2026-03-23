@@ -1,4 +1,3 @@
-// types.ts
 import { Context } from 'aws-lambda';
 import { ZodType } from 'zod';
 
@@ -36,7 +35,7 @@ export type Schemas = {
   path?: ZodType;
 };
 
-/** 统一错误响应结构 */
+/** Unified Error Body */
 export type ApiErrorBody = {
   success: false;
   error: {
@@ -46,7 +45,7 @@ export type ApiErrorBody = {
   };
 };
 
-/** 统一成功响应结构 */
+/** Unified Success body */
 export type ApiSuccessBody<T> = {
   success: true;
   data: T;
