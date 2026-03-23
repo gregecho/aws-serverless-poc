@@ -343,14 +343,12 @@ const UserResponse = BaseUser.extend({
 - [x] Zod runtime validation (request + response)
 - [x] Centralized error handling middleware
 - [x] Standardized error response schemas
-- [x] Auto CRUD handler factory (`createCrudHandlers`)
-- [x] Local DynamoDB with auto table migration
+- [x] Local DynamoDB via Docker
 - [x] OpenAPI documentation auto-generated from Zod schemas
 - [ ] Logging — Structured logging with AWS Lambda Powertools
 - [ ] Observability — AWS X-Ray distributed tracing
-- [ ] CI/CD — GitHub Actions (lint, test, deploy)
 - [ ] Security — AWS Secrets Manager integration
-- [ ] LocalStack — Full AWS service simulation via Docker
 - [ ] SQS — Async decoupling for background tasks
 - [ ] Lambda Power Tuning — Memory/cost benchmarking
 - [ ] Auto OpenAPI registration in middleware
+- [ ] OpenAPI auto deployment and swith envs
