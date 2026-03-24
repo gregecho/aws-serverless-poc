@@ -11,6 +11,7 @@ import { AppError } from '@@utils/errors';
 import { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import middy, { MiddlewareObj } from '@middy/core';
 import httpJsonBodyParser from '@middy/http-json-body-parser';
+import { Tracer } from '@aws-lambda-powertools/tracer';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import z, {
   output,
@@ -254,6 +255,41 @@ const registerOpenApiRoute = (options: {
   });
 };
 
+const tracer = new Tracer({ serviceName: 'aws-serverless-infrastructure' });
+
+/**
+ * Wraps each handler invocation in an X-Ray subsegment for distributed tracing.
+ *
+ * before:   opens a "handler" subsegment and makes it the active segment
+ * after:    closes the subsegment on success and restores the parent segment
+ * onError:  records the error on the subsegment before closing it
+ */
+const tracerMiddleware = (): MiddlewareObj<APIGatewayProxyEvent, APIGatewayProxyResult> => ({
+  before: async (request) => {
+    const segment = tracer.getSegment();
+    if (segment) {
+      const subsegment = segment.addNewSubsegment('handler');
+      request.internal = { ...request.internal, xraySubsegment: subsegment };
+      tracer.setSegment(subsegment);
+    }
+  },
+  after: async (request) => {
+    const subsegment = (request.internal as any)?.xraySubsegment;
+    if (subsegment) {
+      subsegment.close();
+      tracer.setSegment(subsegment.parent);
+    }
+  },
+  onError: async (request) => {
+    const subsegment = (request.internal as any)?.xraySubsegment;
+    if (subsegment) {
+      subsegment.addError(request.error as Error);
+      subsegment.close();
+      tracer.setSegment(subsegment.parent);
+    }
+  },
+});
+
 /**
  * Middy-enabled handler for API Gateway Proxy Lambda handlers
  */
@@ -276,6 +312,7 @@ export const restApiHandler = <
   };
 }) => {
   const wrapper = middy()
+    .use(tracerMiddleware())
     .use(httpJsonBodyParser())
     .use(
       zodValidationMiddleware({

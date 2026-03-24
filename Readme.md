@@ -59,6 +59,7 @@ error:  errorHandler
 | **Testing**        | Vitest, Faker.js                     |
 | **Local DynamoDB** | serverless-dynamodb                  |
 | **Logging**        | AWS Lambda Powertools Logger         |
+| **Tracing**        | AWS X-Ray + Lambda Powertools Tracer |
 | **Docs**           | Redocly + zod-to-openapi             |
 
 ---
@@ -231,7 +232,15 @@ pnpm docs:preview
 
 # Build standalone index.html
 pnpm docs:build
+
+# Deploy index.html to S3 (dev)
+pnpm docs:deploy:dev
+
+# Get the public website URL
+pnpm docs:url
 ```
+
+The `docs:deploy:dev` command builds the docs and uploads `index.html` to the `aws-serverless-infrastructure-docs-dev` S3 bucket, which is provisioned by `serverless.ts` as a public static website.
 
 ---
 
@@ -389,16 +398,63 @@ pnpm docs:preview
 
 ## 📋 Monitoring & Logs
 
+### Structured Logging (AWS Lambda Powertools)
+
+Logging uses [`@aws-lambda-powertools/logger`](https://docs.powertools.aws.dev/lambda/typescript/latest/core/logger/). A `Logger` instance is created per handler with a `serviceName` for correlation.
+
+```typescript
+import { Logger } from '@aws-lambda-powertools/logger';
+
+const logger = new Logger({ serviceName: 'myService' });
+
+logger.info('user created', { userId: result.id });
+logger.warn('something unexpected', { detail });
+logger.error('operation failed', { error });
+```
+
+Log output is structured JSON, automatically enriched with Lambda context (request ID, cold start, etc.) when running on AWS.
+
+**Viewing logs:**
+
 ```bash
-# Tail logs for a specific deployed handler
+# Tail logs for a deployed handler
 pnpm logs user-create --tail
-pnpm logs user-get --tail
 
 # Filter for errors only
 aws logs tail /aws/lambda/aws-serverless-infrastructure-dev-user-create \
   --follow \
   --filter-pattern "ERROR"
 ```
+
+### Distributed Tracing (AWS X-Ray)
+
+X-Ray tracing is enabled at both the API Gateway and Lambda levels via `serverless.ts`. Each handler invocation is automatically wrapped in an X-Ray subsegment by the `tracerMiddleware` in [src/middleware/api.ts](src/middleware/api.ts).
+
+The tracer uses [`@aws-lambda-powertools/tracer`](https://docs.powertools.aws.dev/lambda/typescript/latest/core/tracer/).
+
+**What is traced automatically:**
+- Every Lambda invocation (segment created by the X-Ray daemon)
+- Each handler execution (subsegment via `tracerMiddleware`)
+- Errors are recorded on the subsegment automatically
+
+**Viewing traces:**
+
+```bash
+# Open AWS Console → X-Ray → Traces
+# Filter by service name: aws-serverless-infrastructure
+```
+
+Or via CLI:
+
+```bash
+aws xray get-trace-summaries \
+  --time-range-type TraceId \
+  --start-time $(date -u -v-1H +%s) \
+  --end-time $(date -u +%s) \
+  --region us-east-1
+```
+
+> X-Ray tracing is only active on deployed AWS environments. It is a no-op locally (`serverless-offline` does not emulate X-Ray).
 
 ---
 
@@ -448,9 +504,9 @@ const UserResponse = BaseUser.extend({
 - [x] OpenAPI documentation auto-generated from Zod schemas
 - [x] Auto-register OpenAPI routes in restApiHander
 - [x] Multi-server OpenAPI spec with env-base URLS
-- [ ] OpenAPI deploy to S3 static html
-- [ ] Logging — Structured logging with AWS Lambda Powertools
-- [ ] Observability — AWS X-Ray distributed tracing
+- [x] OpenAPI deploy to S3 static html
+- [x] Logging — Structured logging with AWS Lambda Powertools
+- [x] Observability — AWS X-Ray distributed tracing
 - [ ] Security — AWS Secrets Manager integration
 - [ ] SQS — Async decoupling for background tasks
 - [ ] Lambda Power Tuning — Memory/cost benchmarking

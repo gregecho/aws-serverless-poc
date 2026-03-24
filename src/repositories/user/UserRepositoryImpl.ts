@@ -1,24 +1,24 @@
-import { dynamo } from '@@clients/dynamoClient';
+import { dynamo } from "@@clients/dynamoClient";
 import {
   UserBody,
   UserResponse,
   userResponseSchema,
-} from '@@schemas/user/userSchema';
-import { Errors } from '@@utils/errors';
+} from "@@schemas/user/userSchema";
+import { Errors } from "@@utils/errors";
 import {
   DeleteCommand,
   GetCommand,
   PutCommand,
   ScanCommand,
   UpdateCommand,
-} from '@aws-sdk/lib-dynamodb';
-import { randomUUID } from 'crypto';
-import { UserRepository } from './userRepository';
+} from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
+import { UserRepository } from "./UserRepository";
 
 const TABLE = process.env.USERS_TABLE;
 
 const PK = (id: string) => `USER#${id}`;
-const SK = 'PROFILE';
+const SK = "PROFILE";
 
 class UserRepositoryImpl implements UserRepository {
   async getById(userId: string): Promise<UserResponse> {
@@ -30,7 +30,7 @@ class UserRepositoryImpl implements UserRepository {
     );
 
     if (!Item) {
-      throw Errors.NOT_FOUND('user');
+      throw Errors.NOT_FOUND("user");
     }
 
     return userResponseSchema.parse(Item);
@@ -51,7 +51,7 @@ class UserRepositoryImpl implements UserRepository {
       new PutCommand({
         TableName: TABLE,
         Item: item,
-        ConditionExpression: 'attribute_not_exists(PK)', // prevent overwrite
+        ConditionExpression: "attribute_not_exists(PK)", // prevent overwrite
       }),
     );
 
@@ -66,7 +66,7 @@ class UserRepositoryImpl implements UserRepository {
     }
 
     const UpdateExpression =
-      'SET ' + entries.map((_, i) => `#k${i} = :v${i}`).join(', ');
+      "SET " + entries.map((_, i) => `#k${i} = :v${i}`).join(", ");
 
     const ExpressionAttributeNames = Object.fromEntries(
       entries.map(([k], i) => [`#k${i}`, k]),
@@ -83,13 +83,13 @@ class UserRepositoryImpl implements UserRepository {
         UpdateExpression,
         ExpressionAttributeNames,
         ExpressionAttributeValues,
-        ConditionExpression: 'attribute_exists(PK)', // ensure exists
-        ReturnValues: 'ALL_NEW',
+        ConditionExpression: "attribute_exists(PK)", // ensure exists
+        ReturnValues: "ALL_NEW",
       }),
     );
 
     if (!Attributes) {
-      throw Errors.NOT_FOUND('user');
+      throw Errors.NOT_FOUND("user");
     }
 
     return userResponseSchema.parse(Attributes);
@@ -100,19 +100,19 @@ class UserRepositoryImpl implements UserRepository {
       new DeleteCommand({
         TableName: TABLE,
         Key: { PK: PK(userId), SK },
-        ConditionExpression: 'attribute_exists(PK)', // ensure exists
+        ConditionExpression: "attribute_exists(PK)", // ensure exists
       }),
     );
   }
 
   async list(
-    query?: Record<string, string | undefined>,
+    _query?: Record<string, string | undefined>,
   ): Promise<UserResponse[]> {
     const { Items = [] } = await dynamo.send(
       new ScanCommand({
         TableName: TABLE,
-        FilterExpression: 'SK = :sk',
-        ExpressionAttributeValues: { ':sk': SK },
+        FilterExpression: "SK = :sk",
+        ExpressionAttributeValues: { ":sk": SK },
       }),
     );
 

@@ -1,4 +1,4 @@
-import { UserRepository } from '@@repositories/user/userRepository';
+import { UserRepository } from '@@repositories/user/UserRepository';
 import type { UserBody, UserResponse } from '@@schemas/user/userSchema';
 
 export class UserService {

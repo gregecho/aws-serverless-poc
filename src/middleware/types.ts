@@ -1,4 +1,5 @@
 import { Context } from 'aws-lambda';
+import { RouteConfig } from '@asteasolutions/zod-to-openapi';
 
 /**
  * Represents the normalized and validated input passed to the business handler.
@@ -30,4 +31,13 @@ export type ApiErrorBody = {
 export type ApiSuccessBody<T> = {
   success: true;
   data: T;
+};
+
+/** OpenAPI route metadata for restApiHandler */
+export type OpenApiMeta = {
+  method: RouteConfig['method'];
+  path: string;
+  summary?: string;
+  tags?: string[];
+  description?: string;
 };
