@@ -8,30 +8,14 @@
 # CREATE
 # ─────────────────────────────────────────────
 
-# Create user and get PreSigned Url - valid
+# Create user
 POST {{base}}
 content-type: application/json
 
 {
-    "name": "test user",
-    "email": "test@test.com"
+    "name": "Greg Li",
+    "email": "greg.li@hyatt.com"
 }
-
-###
-# 2. Upload image via PreSigned Url
-PUT https://aws-serverless-infrastructure-portraits-dev.s3.us-east-1.amazonaws.com/portraits/7a5bb6fd-fe24-4007-8611-159f8405db8e.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIASKXPQXM72EFJQWQG%2F20260325%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260325T034446Z&X-Amz-Expires=300&X-Amz-Security-Token=IQoJb3JpZ2luX2VjENz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJIMEYCIQCtqjRg95YTP97h%2BLX7D%2F7MEqVTaC7W%2Fu1Cmnst8sxTVgIhAKzdo6bCerSX2anLAqT1AaQH7S8u51dSOnBjtI9AJhBxKskECKX%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMMTYwNDg5ODQ3NjE1IgwaarO3fkRPhjGcyDgqnQRdWpyUc6JJ3cWkwzcWBW1d6r1GGQ4I0vbfLHXOomsQ7u%2FjKewx2LlxWjgFzDFMadWjDSA1RSzzGtJC22SzrRDYGzVffo9b%2BItmSrVT%2BXd0%2F7ZKxtYuQDpYW%2FjS%2FTrWVHKc17KRltjm6FbmicThl4QYtTsAII%2BpV2a9CK9YxYGdZjsT0sJ%2BrBWYsQc5JpNDHRaBNS20T%2B6yPMnND70b3ZJzJd%2BP1PF%2BNLHxemz6BJogY96etZRRFuSI6B5dl91deFpVfwcn7vHhX25j8PKFn5ZKPqj%2Fzh1N4RBOO7Bbaa%2FteFDJCGQJXp80rDLVV8QSYKMnHVBzDSo8tnj%2F99JZ195hzztY120CahHVOxy8OveXe%2FGqCz%2BqnJcKwwgAQBO7LGC4Yoy9FdbrAOMscV0UW1l9GZT45TW5TROqmA%2BDBVtjwsv%2FrvrIjhqr4NWe5Q5ql0BR7HvKRKoOk0FHgOiz9%2B25KbJ0hop9o23Q7HFhBAnHGdHXMaqBQtmAvXI%2FeXCMI%2B918vkIYTRd1vbcEKZ2Mbr0%2FFG637KKzm5TknJ78XshKqRSJ8Dt0XvxOIr0FoXQa4yA4age8X6JTYUQqfHuoloEpJijAcXzzLX9wz5az%2FGosdesxa8rkL1DGTIGyZ%2BdZHWCe5bUIim99OfP1tOdyBcWglmNsyepipiUwf0TrZaaXaNl1Xte82sBhUS8gjhDgyqvHHIQBtTgXYabY1ioMK20jc4GOqEBwve2XyPYjSdmfTzfn37malVZlpfYI1IecFyDNVPeF20Dm%2BRIbmoES%2Bdp4LJeYlOPJNKu%2FIdaEyYXwL%2BdjVdJ428zEsUOrKs66nZBt6%2FEQcDXAKopM4o7z8u7ZmmmQPO4CfWoIVNkA3MKJcKpp9HByFVlSbMu1u1m%2BK4DRGyK8ojbm3rB8hfjGLAYSoLGOmlz7sV7N8aTblSWTn8ZI0%2B01go%3D&X-Amz-Signature=bff64e13707c5fd6488bd3bc47396866622bbe3f8e0630c125c0d8cd4066cae6&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="text"
-
-title
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="image"; filename="api-gateway-how-it-works.png"
-Content-Type: image/png
-
-< ./documentation/api-gateway-how-it-works.png
-------WebKitFormBoundary7MA4YWxkTrZu0gW--
-
 
 ###
 
@@ -124,6 +108,16 @@ content-type: application/json
 
 ###
 
+# Update user - save portrait key after upload
+PATCH {{base}}/{{userId}}
+content-type: application/json
+
+{
+    "portraitKey": "portraits/{{userId}}.jpg"
+}
+
+###
+
 # Update user - invalid email
 PATCH {{base}}/{{userId}}
 content-type: application/json
@@ -163,3 +157,47 @@ content-type: application/json
 # Delete user - invalid uuid
 DELETE {{base}}/not-a-uuid
 content-type: application/json
+
+###
+
+# ─────────────────────────────────────────────
+# PORTRAIT UPLOAD
+# ─────────────────────────────────────────────
+
+# 1. Get presigned upload URL
+GET {{base}}/{{userId}}/portrait/upload-url
+content-type: application/json
+
+###
+
+# 2. Upload image via presigned URL (replace URL from step 1 response)
+PUT https://aws-serverless-infrastructure-portraits-dev.s3.us-east-1.amazonaws.com/portraits/1f234ee3-7145-4b43-bcb6-6627c5d3dd87.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIASKXPQXM7VHZJMST5%2F20260326%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260326T013655Z&X-Amz-Expires=300&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEPL%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIA0cMBnxfoeKOoUUT9fyNWXJ0aQ7qpSZSSoNeTXg5Y0vAiEAhR4dlMLWVNQtRzkk4O13OvDyGeztNBd13v0tZk%2Bn210q8AQIu%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARAAGgwxNjA0ODk4NDc2MTUiDLpXTylZTxZE69PSHirEBNoN9%2BDTzhSMkvMve87mTL9X2x1rzfdwfFU5LscTnIwUxj3JhjBjSmG0UyBPkfCV7x8%2BOYYKogdynYGW9FxcPPmtxCrLsljJ%2Fz6CpltU%2BSki%2BbtO%2FwSHNoO2RwytSgWvBirAB35xROy%2FmnMv%2FAItMvtFc3r568BjmKiQHv1FvdSBr592A1Ze7lUsUkMAP3EHnvX0kdmhES%2BQf8DnE%2BrW%2Bmnh0gYdyEohs%2FOifO%2FnZcPdbZjoqjW%2BSLeajAD3YKMb7JYbHSZ6uS97HWjX4M3nM583wET64VxEX9jil5lKApTMxsxpbrDu7nG1iZaPabT6wGJ5I2ou4XgJb%2B4t%2B%2FEJk8jvzGx5L3oscG7FJ%2Ft0HPeN5l8F%2Bpw%2Bo4hBRAO6nfOh8Ml3hBLRpU%2BS%2B24aGvrO%2BbDWRxaojqNaqNxcMMMBqmrr%2FFYrbbXTzDBqBI4h5b4c2NVB7rkR%2BK8mgdnofd%2F7gGVRa5vGby3nhBymPk1R92t1IGd9A45bchwU6JdZbhHPxl6dTbZvBcJKzkRp9cdRMN00BHDitFSnbh9ua5yY1fYA1mynhMsjRFpcAnB9%2BGbzS0z9UOshxghX6%2F3e90xS%2BzloWLBiNpOa0M%2FVsLjXguMbqb3P9dxJq6Ap0n708HMvQlTGecmFvCYRXOBYq1fRlx0oaNjkAj1PHEM65PMI%2BmVUuZz4StDX%2B1ZJaUjE6%2FEtx3%2BlxWqTOH4JpIYwoE4uqUGKG1YlAuDXzotELce6NUetQtyWp02wXCWhOfl5atWkUNt1vJ8wtpuSzgY6owEIfqgFXc7oUPUS0fr%2FT69qF9kkNfKeObLp6vnih4g0iTtzAKiha0%2FnpbY0q7z0X0FfdXcuBJEdy3%2BpJsb5KGT6j5%2BXo1KMQDMOWDQtSEBpu0SyBT6Plnn19F1UZaTU%2B3NadmkDLDwqtPPDtDFanIm0%2FEqfsoH8p0ZoekEfciLH9lsxmJmIj8CXQI5HcBP%2Fcqa%2BurqlB4aKXjZyFIcRXB1XNw5p&X-Amz-Signature=48f34089ae053925e419c6b2fab1751abb489e029f4163f20558f64cbff178d0&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject
+Content-Type: image/jpeg
+
+< ./documentation/api-gateway-how-it-works.png
+
+###
+
+# ─────────────────────────────────────────────
+# EMAIL VERIFICATION
+# ─────────────────────────────────────────────
+
+# Send verification code
+POST {{base}}/{{userId}}/verify/send
+content-type: application/json
+
+{
+    "email": "test@test.com"
+}
+
+###
+
+# Confirm verification code
+POST {{base}}/{{userId}}/verify/confirm
+content-type: application/json
+
+{
+    "code": "123456"
+}
+
+###

@@ -28,46 +28,32 @@ const makeUser = () => ({
   createdAt: new Date().toISOString(),
 });
 
+const event = {
+  body: (data: unknown) => JSON.stringify(data),
+  path: (id: string) => ({ pathParameters: { id }, body: null, headers: { "Content-Type": "application/json" } } as any),
+  query: (params: Record<string, string> | null) => ({ queryStringParameters: params, body: null, headers: { "Content-Type": "application/json" } } as any),
+  post: (data: unknown) => ({ body: JSON.stringify(data), headers: { "Content-Type": "application/json" } } as any),
+};
+
 describe("User API (integration)", () => {
-  describe("createUser API (integration)", () => {
-    const mockCreate = vi.fn();
-    beforeEach(() => {
-      vi.spyOn(UserServiceImpl.prototype, "create").mockImplementation(mockCreate);
-    });
+  describe("createUser", () => {
+    const mockCreate = vi.spyOn(UserServiceImpl.prototype, "create");
 
     test("should return 200 when request is valid", async () => {
       const user = makeUser();
       mockCreate.mockResolvedValue(user);
 
-      const response = await createUserHandler(
-        {
-          body: JSON.stringify({ name: user.name, email: user.email }),
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await createUserHandler(event.post({ name: user.name, email: user.email }), {} as any);
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
       expect(body.data).toMatchObject({ name: user.name, email: user.email });
-      expect(mockCreate).toHaveBeenCalledWith({
-        name: user.name,
-        email: user.email,
-      });
+      expect(mockCreate).toHaveBeenCalledWith({ name: user.name, email: user.email });
     });
 
-    test("should return 400 when email invalid", async () => {
-      const response = await createUserHandler(
-        {
-          body: JSON.stringify({
-            name: faker.person.firstName(),
-            email: "invalid-email",
-          }),
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+    test("should return 400 when email is invalid", async () => {
+      const response = await createUserHandler(event.post({ name: faker.person.firstName(), email: "invalid-email" }), {} as any);
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.body).error.code).toBe("VALIDATION_ERROR");
@@ -76,10 +62,7 @@ describe("User API (integration)", () => {
 
     test("should return 400 when body is invalid JSON", async () => {
       const response = await createUserHandler(
-        {
-          body: "{ invalid json }",
-          headers: { "Content-Type": "application/json" },
-        } as any,
+        { body: "{ invalid json }", headers: { "Content-Type": "application/json" } } as any,
         {} as any,
       );
 
@@ -90,74 +73,37 @@ describe("User API (integration)", () => {
     test("should return 500 when service throws", async () => {
       mockCreate.mockRejectedValue(new Error("DB down"));
 
-      const response = await createUserHandler(
-        {
-          body: JSON.stringify({
-            name: faker.person.firstName(),
-            email: faker.internet.email(),
-          }),
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await createUserHandler(event.post({ name: faker.person.firstName(), email: faker.internet.email() }), {} as any);
 
       expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.body).error.code).toBe("INTERNAL_ERROR");
     });
   });
 
-  describe("getUserById API (integration)", () => {
-    const mockGetById = vi.fn();
-    beforeEach(() => {
-      vi.spyOn(UserServiceImpl.prototype, "getById").mockImplementation(
-        mockGetById,
-      );
-    });
+  describe("getUserById", () => {
+    const mockGetById = vi.spyOn(UserServiceImpl.prototype, "getById");
 
     test("should return 200 with user data", async () => {
       const user = makeUser();
       mockGetById.mockResolvedValue(user);
 
-      const response = await getUserByIdHandler(
-        {
-          pathParameters: { id: user.id },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await getUserByIdHandler(event.path(user.id), {} as any);
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data).toMatchObject({ id: user.id, name: user.name });
+      expect(JSON.parse(response.body).data).toMatchObject({ id: user.id, name: user.name });
     });
 
     test("should return 404 when user not found", async () => {
       mockGetById.mockRejectedValue(Errors.NOT_FOUND("user"));
 
-      const response = await getUserByIdHandler(
-        {
-          pathParameters: { id: faker.string.uuid() },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await getUserByIdHandler(event.path(faker.string.uuid()), {} as any);
 
       expect(response.statusCode).toBe(404);
       expect(JSON.parse(response.body).error.code).toBe("RESOURCE_NOT_FOUND");
     });
 
     test("should return 400 when id is not a valid UUID", async () => {
-      const response = await getUserByIdHandler(
-        {
-          pathParameters: { id: "not-a-uuid" },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await getUserByIdHandler(event.path("not-a-uuid"), {} as any);
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.body).error.code).toBe("VALIDATION_ERROR");
@@ -165,40 +111,21 @@ describe("User API (integration)", () => {
     });
   });
 
-  describe("listUsers API (integration)", () => {
-    const mockList = vi.fn();
-    beforeEach(() => {
-      vi.spyOn(UserServiceImpl.prototype, "list").mockImplementation(mockList);
-    });
+  describe("listUsers", () => {
+    const mockList = vi.spyOn(UserServiceImpl.prototype, "list");
 
     test("should return 200 with list of users", async () => {
       const users = [makeUser(), makeUser()];
       mockList.mockResolvedValue(users);
 
-      const response = await listUsersHandler(
-        {
-          queryStringParameters: null,
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await listUsersHandler(event.query(null), {} as any);
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(2);
+      expect(JSON.parse(response.body).data).toHaveLength(2);
     });
 
     test("should return 400 when query param is invalid", async () => {
-      const response = await listUsersHandler(
-        {
-          queryStringParameters: { page: "abc" },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await listUsersHandler(event.query({ page: "abc" }), {} as any);
 
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.body).error.code).toBe("VALIDATION_ERROR");
@@ -208,54 +135,35 @@ describe("User API (integration)", () => {
     test("should return 500 when service throws", async () => {
       mockList.mockRejectedValue(new Error("DB error"));
 
-      const response = await listUsersHandler(
-        {
-          queryStringParameters: null,
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await listUsersHandler(event.query(null), {} as any);
 
       expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.body).error.code).toBe("INTERNAL_ERROR");
     });
   });
 
-  describe("updateUser API (integration)", () => {
-    const mockUpdate = vi.fn();
-    beforeEach(() => {
-      vi.spyOn(UserServiceImpl.prototype, "update").mockImplementation(mockUpdate);
-    });
+  describe("updateUser", () => {
+    const mockUpdate = vi.spyOn(UserServiceImpl.prototype, "update");
 
     test("should return 200 with updated user", async () => {
       const user = makeUser();
       mockUpdate.mockResolvedValue(user);
 
       const response = await updateUserHandler(
-        {
-          pathParameters: { id: user.id },
-          body: JSON.stringify({ name: user.name }),
-          headers: { "Content-Type": "application/json" },
-        } as any,
+        { pathParameters: { id: user.id }, body: JSON.stringify({ name: user.name }), headers: { "Content-Type": "application/json" } } as any,
         {} as any,
       );
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data).toMatchObject({ id: user.id });
+      expect(JSON.parse(response.body).data).toMatchObject({ id: user.id });
+      expect(mockUpdate).toHaveBeenCalledWith(user.id, { name: user.name });
     });
 
     test("should return 404 when user not found", async () => {
       mockUpdate.mockRejectedValue(Errors.NOT_FOUND("user"));
 
       const response = await updateUserHandler(
-        {
-          pathParameters: { id: faker.string.uuid() },
-          body: JSON.stringify({ name: "New Name" }),
-          headers: { "Content-Type": "application/json" },
-        } as any,
+        { pathParameters: { id: faker.string.uuid() }, body: JSON.stringify({ name: "New Name" }), headers: { "Content-Type": "application/json" } } as any,
         {} as any,
       );
 
@@ -265,11 +173,7 @@ describe("User API (integration)", () => {
 
     test("should return 400 when body fails validation", async () => {
       const response = await updateUserHandler(
-        {
-          pathParameters: { id: faker.string.uuid() },
-          body: JSON.stringify({ email: "not-an-email" }),
-          headers: { "Content-Type": "application/json" },
-        } as any,
+        { pathParameters: { id: faker.string.uuid() }, body: JSON.stringify({ email: "not-an-email" }), headers: { "Content-Type": "application/json" } } as any,
         {} as any,
       );
 
@@ -279,24 +183,14 @@ describe("User API (integration)", () => {
     });
   });
 
-  describe("deleteUser API (integration)", () => {
-    const mockDelete = vi.fn();
-    beforeEach(() => {
-      vi.spyOn(UserServiceImpl.prototype, "delete").mockImplementation(mockDelete);
-    });
+  describe("deleteUser", () => {
+    const mockDelete = vi.spyOn(UserServiceImpl.prototype, "delete");
 
     test("should return 200 when user deleted", async () => {
       const id = faker.string.uuid();
       mockDelete.mockResolvedValue(undefined);
 
-      const response = await deleteUserHandler(
-        {
-          pathParameters: { id },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await deleteUserHandler(event.path(id), {} as any);
 
       expect(response.statusCode).toBe(200);
       expect(mockDelete).toHaveBeenCalledWith(id);
@@ -305,28 +199,14 @@ describe("User API (integration)", () => {
     test("should return 404 when user not found", async () => {
       mockDelete.mockRejectedValue(Errors.NOT_FOUND("user"));
 
-      const response = await deleteUserHandler(
-        {
-          pathParameters: { id: faker.string.uuid() },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await deleteUserHandler(event.path(faker.string.uuid()), {} as any);
 
       expect(response.statusCode).toBe(404);
       expect(JSON.parse(response.body).error.code).toBe("RESOURCE_NOT_FOUND");
     });
 
     test("should return 400 when id is not a valid UUID", async () => {
-      const response = await deleteUserHandler(
-        {
-          pathParameters: { id: "bad-id" },
-          body: null,
-          headers: { "Content-Type": "application/json" },
-        } as any,
-        {} as any,
-      );
+      const response = await deleteUserHandler(event.path("bad-id"), {} as any);
 
       expect(response.statusCode).toBe(400);
       expect(mockDelete).not.toHaveBeenCalled();
