@@ -7,12 +7,15 @@
  * - Automatic response normalization
  */
 
-import { AppError } from '@@utils/errors';
-import { RouteConfig } from '@asteasolutions/zod-to-openapi';
-import middy, { MiddlewareObj } from '@middy/core';
-import httpJsonBodyParser from '@middy/http-json-body-parser';
-import { Tracer } from '@aws-lambda-powertools/tracer';
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { AppError } from "@@utils/errors";
+import { RouteConfig } from "@asteasolutions/zod-to-openapi";
+import middy, { MiddlewareObj } from "@middy/core";
+import httpJsonBodyParser from "@middy/http-json-body-parser";
+import { Logger } from "@aws-lambda-powertools/logger";
+import { Tracer } from "@aws-lambda-powertools/tracer";
+
+const logger = new Logger({ serviceName: "middleware" });
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import z, {
   output,
   ZodError,
@@ -20,10 +23,10 @@ import z, {
   ZodObject,
   ZodRawShape,
   ZodType,
-} from 'zod';
-import { commonErrors } from '../docs/common.errors';
-import { registry } from '../docs/registry';
-import { ApiErrorBody, HandlerInput, OpenApiMeta } from './types';
+} from "zod";
+import { commonErrors } from "../docs/common.errors";
+import { registry } from "../docs/registry";
+import { ApiErrorBody, HandlerInput, OpenApiMeta } from "./types";
 
 /**
  * Middleware to validate and transform incoming API Gateway request data using Zod schemas.
@@ -111,7 +114,7 @@ export const errorHandler = (): MiddlewareObj<
     if (error instanceof ZodError) {
       request.response = jsonResponse(
         400,
-        errorBody('VALIDATION_ERROR', 'Validation failed', error.issues),
+        errorBody("VALIDATION_ERROR", "Validation failed", error.issues),
       );
       return;
     }
@@ -127,20 +130,21 @@ export const errorHandler = (): MiddlewareObj<
 
     // Parse error
     if (
-      error?.name === 'ParseError' ||
-      error?.name === 'UnprocessableEntityError'
+      error?.name === "ParseError" ||
+      error?.name === "UnprocessableEntityError"
     ) {
       request.response = jsonResponse(
         400,
-        errorBody('INVALID_JSON', 'Invalid JSON format', error.message),
+        errorBody("INVALID_JSON", "Invalid JSON format", error.message),
       );
       return;
     }
 
     // Other
+    logger.error("Unhandled error", { error });
     request.response = jsonResponse(
       500,
-      errorBody('INTERNAL_ERROR', error?.message || 'Internal Server Error'),
+      errorBody("INTERNAL_ERROR", error?.message || "Internal Server Error"),
     );
   },
 });
@@ -156,11 +160,11 @@ export const errorHandler = (): MiddlewareObj<
  * @returns Middy middleware object
  *
  * @example
- * export const handler = restApiHandler({
- *   body: CreateUserSchema,
- *   response: UserResponseSchema,
+ * export const createUserHandler = restApiHandler({
+ *  body: createUserRequestSchema,
+ *  response: userResponseSchema,
+ *  openapi: { method: 'post', path: '/users', summary: 'Create user', tags: ['User'] },
  * }).handler(async ({ body }) => {
- *   return createUser(body);
  * });
  */
 const responseMiddleware = (): MiddlewareObj<
@@ -185,7 +189,7 @@ const jsonResponse = (
   body: unknown,
 ): APIGatewayProxyResult => ({
   statusCode,
-  headers: { 'content-type': 'application/json' },
+  headers: { "content-type": "application/json" },
   body: JSON.stringify(body),
 });
 
@@ -217,11 +221,11 @@ const registerOpenApiRoute = (options: {
 }): void => {
   const { openapi } = options;
 
-  const request: RouteConfig['request'] = {
+  const request: RouteConfig["request"] = {
     ...(options.body && {
       body: {
         content: {
-          'application/json': { schema: options.body },
+          "application/json": { schema: options.body },
         },
       },
     }),
@@ -231,11 +235,11 @@ const registerOpenApiRoute = (options: {
     ...(options.path && { params: options.path as ZodObject<ZodRawShape> }),
   };
 
-  const responses: RouteConfig['responses'] = {
+  const responses: RouteConfig["responses"] = {
     200: {
-      description: 'Success',
+      description: "Success",
       content: {
-        'application/json': {
+        "application/json": {
           // Set to empty object schema if no response schema provided
           schema: options.response ?? z.object({}),
         },
@@ -255,7 +259,7 @@ const registerOpenApiRoute = (options: {
   });
 };
 
-const tracer = new Tracer({ serviceName: 'aws-serverless-infrastructure' });
+const tracer = new Tracer({ serviceName: "aws-serverless-infrastructure" });
 
 /**
  * Wraps each handler invocation in an X-Ray subsegment for distributed tracing.
@@ -264,11 +268,14 @@ const tracer = new Tracer({ serviceName: 'aws-serverless-infrastructure' });
  * after:    closes the subsegment on success and restores the parent segment
  * onError:  records the error on the subsegment before closing it
  */
-const tracerMiddleware = (): MiddlewareObj<APIGatewayProxyEvent, APIGatewayProxyResult> => ({
+const tracerMiddleware = (): MiddlewareObj<
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult
+> => ({
   before: async (request) => {
     const segment = tracer.getSegment();
     if (segment) {
-      const subsegment = segment.addNewSubsegment('handler');
+      const subsegment = segment.addNewSubsegment("handler");
       request.internal = { ...request.internal, xraySubsegment: subsegment };
       tracer.setSegment(subsegment);
     }
@@ -304,7 +311,7 @@ export const restApiHandler = <
   path?: P;
   response?: R;
   openapi?: {
-    method: RouteConfig['method'];
+    method: RouteConfig["method"];
     path: string;
     summary?: string;
     tags?: string[];

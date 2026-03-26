@@ -3,9 +3,12 @@ import { PublishCommand } from "@aws-sdk/client-sns";
 import { s3Client, sns } from "@@clients/aws.client";
 import { UserRepository } from "@@repositories/user/UserRepository";
 import type { UserBody, UserResponse, UserUpdateFields } from "@@schemas/user/userSchema";
+import { Logger } from "@aws-lambda-powertools/logger";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { BedrockService } from "../ai/BedrockService";
 import type { UserService } from "./userService";
+
+const logger = new Logger({ serviceName: "userService" });
 
 const PORTRAITS_BUCKET = process.env.PORTRAITS_BUCKET!;
 const VERIFICATION_TOPIC_ARN = process.env.VERIFICATION_TOPIC_ARN!;
@@ -28,6 +31,7 @@ export class UserServiceImpl implements UserService {
       return { ...user, ...enrichment.value };
     }
 
+    logger.warn("Bedrock enrichment failed", { userId: user.id, error: enrichment.reason });
     return user;
   }
 
