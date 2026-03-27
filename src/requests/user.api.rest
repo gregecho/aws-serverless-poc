@@ -1,4 +1,3 @@
-//@awshost = https://82le3v2e59.execute-api.us-east-1.amazonaws.com
 @awshost = http://localhost:3000
 @stage   = dev
 @base    = {{awshost}}/{{stage}}/users
