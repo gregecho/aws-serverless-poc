@@ -584,6 +584,7 @@ const UserResponse = BaseUser.extend({
 - [x] Portrait upload — Dedicated presigned URL endpoint (`GET /users/{id}/portrait/upload-url`)
 - [x] Email verification — SNS-based 6-digit code flow
 - [x] AI enrichment — Bedrock (Claude 3 Haiku) generates bio/tags on user creation
-- [ ] Security — AWS Secrets Manager integration
+- [ ] Security — Hander the authorization header
+- [ ] Third/Internal service intercation via Axios
 - [ ] SQS — Async decoupling for background tasks
 - [ ] Lambda Power Tuning — Memory/cost benchmarking
