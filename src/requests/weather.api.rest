@@ -1,0 +1,46 @@
+@awshost = https://82le3v2e59.execute-api.us-east-1.amazonaws.com
+@stage   = dev
+@base    = {{awshost}}/{{stage}}
+
+# ─────────────────────────────────────────────
+# PUBLISH WEATHER
+# ─────────────────────────────────────────────
+
+# Publish weather - default city (Jinan)
+POST {{base}}/kinesis/publish
+content-type: application/json
+
+###
+
+# Publish weather - by city name
+POST {{base}}/kinesis/publish?city=Jinan
+content-type: application/json
+
+###
+
+# Publish weather - another city
+POST {{base}}/kinesis/publish?city=New+York
+content-type: application/json
+
+###
+
+# Publish weather - city not found
+POST {{base}}/kinesis/publish?city=NotARealCity99999
+content-type: application/json
+
+###
+
+# ─────────────────────────────────────────────
+# VERIFY S3 DELIVERY
+# ─────────────────────────────────────────────
+
+# Check S3 for delivered records:
+# aws s3 ls s3://aws-serverless-infrastructure-weather-data-dev/weather/ --recursive
+
+###
+
+# ─────────────────────────────────────────────
+# TAIL CONSUMER LOGS
+# ─────────────────────────────────────────────
+
+# serverless logs --function kinesis-consumer --tail --stage dev

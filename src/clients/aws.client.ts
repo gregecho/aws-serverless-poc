@@ -7,6 +7,7 @@ import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
 import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { KinesisClient } from "@aws-sdk/client-kinesis";
+import { FirehoseClient } from "@aws-sdk/client-firehose";
 
 const isLocal = process.env.IS_OFFLINE;
 const region = process.env.AWS_REGION ?? "us-east-1";
@@ -60,3 +61,6 @@ export const bedrock = {
 
 // Kinesis Client
 export const kinesis = new KinesisClient({});
+
+// Firehose Client
+export const firehose = new FirehoseClient({ region });

@@ -26,6 +26,7 @@ const serverlessConfiguration: AWS = {
       PORTRAITS_BUCKET: "${self:service}-portraits-${sls:stage}",
       VERIFICATION_TOPIC_ARN: { Ref: "VerificationTopic" },
       WEATHER_STREAM_NAME: { Ref: "WeatherStream" },
+      WEATHER_FIREHOSE_NAME: { Ref: "WeatherFirehose" },
     },
 
     iam: {
@@ -204,6 +205,78 @@ const serverlessConfiguration: AWS = {
         Properties: {
           Name: "${self:service}-weather-${sls:stage}",
           ShardCount: 1,
+        },
+      },
+      WeatherDataBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: "${self:service}-weather-data-${sls:stage}",
+        },
+      },
+      FirehoseRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "${self:service}-firehose-role-${sls:stage}",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "firehose.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+          Policies: [
+            {
+              PolicyName: "FirehosePolicy",
+              PolicyDocument: {
+                Version: "2012-10-17",
+                Statement: [
+                  {
+                    Effect: "Allow",
+                    Action: [
+                      "kinesis:GetRecords",
+                      "kinesis:GetShardIterator",
+                      "kinesis:DescribeStream",
+                      "kinesis:ListShards",
+                    ],
+                    Resource: { "Fn::GetAtt": ["WeatherStream", "Arn"] },
+                  },
+                  {
+                    Effect: "Allow",
+                    Action: ["s3:PutObject"],
+                    Resource: {
+                      "Fn::Join": [
+                        "",
+                        [{ "Fn::GetAtt": ["WeatherDataBucket", "Arn"] }, "/*"],
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      WeatherFirehose: {
+        Type: "AWS::KinesisFirehose::DeliveryStream",
+        Properties: {
+          DeliveryStreamName: "${self:service}-weather-firehose-${sls:stage}",
+          DeliveryStreamType: "KinesisStreamAsSource",
+          KinesisStreamSourceConfiguration: {
+            KinesisStreamARN: { "Fn::GetAtt": ["WeatherStream", "Arn"] },
+            RoleARN: { "Fn::GetAtt": ["FirehoseRole", "Arn"] },
+          },
+          ExtendedS3DestinationConfiguration: {
+            BucketARN: { "Fn::GetAtt": ["WeatherDataBucket", "Arn"] },
+            RoleARN: { "Fn::GetAtt": ["FirehoseRole", "Arn"] },
+            Prefix:
+              "weather/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
+            ErrorOutputPrefix: "errors/",
+            BufferingHints: { IntervalInSeconds: 60, SizeInMBs: 5 },
+            CompressionFormat: "GZIP",
+          },
         },
       },
     },

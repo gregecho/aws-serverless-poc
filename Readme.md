@@ -50,20 +50,20 @@ error:  errorHandler
 
 ## 🛠️ Tech Stack
 
-| Category           | Technology                           |
-| :----------------- | :----------------------------------- |
-| **Language**       | TypeScript                           |
-| **Framework**      | Serverless Framework v4              |
-| **Middleware**     | Middy (@middy/core)                  |
-| **Validation**     | Zod                                  |
-| **Database**       | AWS DynamoDB (@aws-sdk/lib-dynamodb) |
-| **AI Enrichment**  | AWS Bedrock (Claude 3 Haiku)         |
-| **Testing**        | Vitest, Faker.js                     |
-| **Local DynamoDB** | serverless-dynamodb                  |
-| **Logging**        | AWS Lambda Powertools Logger         |
-| **Tracing**        | AWS X-Ray + Lambda Powertools Tracer |
-| **Docs**           | Redocly + zod-to-openapi             |
-| **Event Streaming** | AWS Kinesis Data Streams (@aws-sdk/client-kinesis) |
+| Category            | Technology                                                                              |
+| :------------------ | :-------------------------------------------------------------------------------------- |
+| **Language**        | TypeScript                                                                              |
+| **Framework**       | Serverless Framework v4                                                                 |
+| **Middleware**      | Middy (@middy/core)                                                                     |
+| **Validation**      | Zod                                                                                     |
+| **Database**        | AWS DynamoDB (@aws-sdk/lib-dynamodb)                                                    |
+| **AI Enrichment**   | AWS Bedrock (Claude 3 Haiku)                                                            |
+| **Testing**         | Vitest, Faker.js                                                                        |
+| **Local DynamoDB**  | serverless-dynamodb                                                                     |
+| **Logging**         | AWS Lambda Powertools Logger                                                            |
+| **Tracing**         | AWS X-Ray + Lambda Powertools Tracer                                                    |
+| **Docs**            | Redocly + zod-to-openapi                                                                |
+| **Event Streaming** | AWS Kinesis Data Streams + Firehose (@aws-sdk/client-kinesis, @aws-sdk/client-firehose) |
 
 ---
 
@@ -258,16 +258,16 @@ The `docs:deploy:dev` command builds the docs and uploads `index.html` to the `a
 
 ## 🧩 API Endpoints
 
-| Method   | Path                              | Description                                    |
-| :------- | :-------------------------------- | :--------------------------------------------- |
-| `POST`   | `/users`                          | Create user — AI-enriched bio/tags via Bedrock |
-| `GET`    | `/users/{id}`                     | Get user by ID                                 |
-| `GET`    | `/users`                          | List users                                     |
-| `PATCH`  | `/users/{id}`                     | Update user                                    |
-| `DELETE` | `/users/{id}`                     | Delete user                                    |
-| `GET`    | `/users/{id}/portrait/upload-url` | Get presigned S3 URL to upload portrait        |
-| `POST`   | `/users/{id}/verify/send`         | Send email verification code via SNS           |
-| `POST`   | `/users/{id}/verify/confirm`      | Confirm verification code                      |
+| Method   | Path                              | Description                                                 |
+| :------- | :-------------------------------- | :---------------------------------------------------------- |
+| `POST`   | `/users`                          | Create user — AI-enriched bio/tags via Bedrock              |
+| `GET`    | `/users/{id}`                     | Get user by ID                                              |
+| `GET`    | `/users`                          | List users                                                  |
+| `PATCH`  | `/users/{id}`                     | Update user                                                 |
+| `DELETE` | `/users/{id}`                     | Delete user                                                 |
+| `GET`    | `/users/{id}/portrait/upload-url` | Get presigned S3 URL to upload portrait                     |
+| `POST`   | `/users/{id}/verify/send`         | Send email verification code via SNS                        |
+| `POST`   | `/users/{id}/verify/confirm`      | Confirm verification code                                   |
 | `POST`   | `/kinesis/publish`                | Fetch weather from Open-Meteo and publish to Kinesis stream |
 
 ### Portrait Upload
@@ -573,44 +573,77 @@ const UserResponse = BaseUser.extend({
 }).openapi("UserResponse");
 ```
 
-## 📡 Event Streaming (Kinesis)
+## 📡 Event Streaming (Kinesis → Firehose → S3 → Athena)
 
 AWS Kinesis Data Streams is a real-time event streaming service — conceptually similar to Apache Kafka (publish/subscribe model):
 
-| Concept | Kafka | Kinesis |
-| :--- | :--- | :--- |
-| Stream | Topic | Stream |
-| Partition | Partition | Shard |
-| Producer | Producer | `PutRecord` / `PutRecords` |
-| Consumer | Consumer Group | Lambda trigger / `GetRecords` |
-| Message | Record | Record (base64-encoded data blob) |
+| Concept   | Kafka          | Kinesis                           |
+| :-------- | :------------- | :-------------------------------- |
+| Stream    | Topic          | Stream                            |
+| Partition | Partition      | Shard                             |
+| Producer  | Producer       | `PutRecord` / `PutRecords`        |
+| Consumer  | Consumer Group | Lambda trigger / `GetRecords`     |
+| Message   | Record         | Record (base64-encoded data blob) |
 
-### How it works in this project
+### Full Pipeline
 
 ```
-POST /kinesis/publish
-  → fetch weather JSON from Open-Meteo API
-  → PutRecord → WeatherStream (1 shard)
-  → Kinesis triggers weatherConsumerHandler (Lambda)
-  → consumer decodes base64 payload and logs it
+POST /kinesis/publish?city=Jinan
+  → Geocoding API (open-meteo) → lat/lng
+  → Open-Meteo forecast API → weather JSON
+  → PutRecord → WeatherStream (Kinesis, 1 shard)
+       │
+       ├─► weatherConsumerHandler (Lambda trigger) → logs payload
+       │
+       └─► WeatherFirehose (Firehose, KinesisStreamAsSource)
+               → buffers records (60s / 5MB)
+               → writes .gz files to WeatherDataBucket (S3)
+                   weather/year=2026/month=04/day=02/file.gz
+                       │
+                       └─► Athena SQL queries (future step)
+                           SELECT * FROM weather WHERE year='2026'
 ```
 
-The producer uses `@aws-sdk/client-kinesis` (`PutRecordCommand`).
-The consumer is a Lambda with a `stream` event trigger — AWS polls the shard on your behalf (no SDK calls needed in the consumer).
+### How each piece works
 
-### Verify end-to-end (requires AWS deploy)
+**Kinesis Data Stream** — the backbone. Your Lambda writes one record per publish call. AWS manages shards, replication, and 24h retention.
+
+**Firehose** — a fully managed delivery service. It taps `WeatherStream` as a source (no Lambda code needed), buffers records, and writes compressed `.gz` files to S3 automatically. You never write Firehose SDK code — it runs on its own.
+
+**S3 + Hive partitions** — Firehose writes files using a date-partitioned prefix:
+
+```
+weather/year=2026/month=04/day=02/aws-serverless-infrastructure-weather-firehose-dev-1-2026-04-02-...gz
+```
+
+This layout is the Hive partition format that Athena understands natively.
+
+**Athena** — a serverless SQL engine that reads S3 files directly as a table. No database to manage. You point it at the S3 prefix, define a schema (via AWS Glue), and run SQL:
+
+```sql
+SELECT current_weather.temperature, current_weather.windspeed
+FROM weather
+WHERE year = '2026' AND month = '04'
+```
+
+Athena skips irrelevant partitions automatically — querying one day costs a fraction of scanning the full bucket.
+
+### City-based weather lookup
+
+The `/kinesis/publish` endpoint accepts an optional `?city=` query parameter. If omitted, it defaults to Berlin.
 
 ```bash
-# 1. Invoke producer
-curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/dev/kinesis/publish
-# Expected: {"success":true,"data":{"published":true}}
+# Default (Berlin)
+POST /kinesis/publish
 
-# 2. Tail consumer logs
-serverless logs --function kinesis-consumer --tail --stage dev
-# Expected: structured log with "weather record received" + Open-Meteo payload
+# By city name — geocodes via Open-Meteo Geocoding API first
+POST /kinesis/publish?city=Tokyo
+POST /kinesis/publish?city=New+York
 ```
 
-> Note: Kinesis stream triggers are not emulated by `serverless-offline`. Full flow requires a real AWS deploy.
+Open-Meteo does not accept city names directly in the forecast API. The handler first calls the [Geocoding API](https://geocoding-api.open-meteo.com) to resolve the city to lat/lng, then fetches the forecast.
+
+> Note: Kinesis stream triggers and Firehose are not emulated by `serverless-offline`. Full flow requires a real AWS deploy.
 
 ---
 
@@ -631,6 +664,8 @@ serverless logs --function kinesis-consumer --tail --stage dev
 - [x] Email verification — SNS-based 6-digit code flow
 - [x] AI enrichment — Bedrock (Claude 3 Haiku) generates bio/tags on user creation
 - [x] Kinesis event streaming — publish/subscribe demo (Open-Meteo weather data → Kinesis stream → Lambda consumer)
+- [x] Kinesis Firehose — stream → S3 delivery with Hive-partitioned prefix (foundation for Athena)
+- [ ] Athena — SQL queries over S3 weather data (Glue table + sample queries)
 - [ ] Security — Hander the authorization header
 - [ ] Third/Internal service intercation via Axios
 - [ ] SQS — Async decoupling for background tasks
